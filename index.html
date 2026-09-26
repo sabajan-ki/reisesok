@@ -423,7 +423,7 @@ const TRIP_Q = `query($from:Location!,$to:Location!,$dt:DateTime,$arriveBy:Boole
   previousPageCursor nextPageCursor
   tripPatterns{ expectedStartTime expectedEndTime aimedStartTime aimedEndTime duration walkDistance
    legs{ mode transportSubmode distance duration realtime aimedStartTime expectedStartTime aimedEndTime expectedEndTime
-    fromPlace{name quay{publicCode name}} toPlace{name quay{publicCode}}
+    fromPlace{name latitude longitude quay{publicCode name stopPlace{id}}} toPlace{name latitude longitude quay{publicCode stopPlace{id}}}
     line{publicCode name presentation{colour textColour}}
     operator{name url} authority{name url}
     fromEstimatedCall{destinationDisplay{frontText} cancellation}
@@ -551,8 +551,35 @@ function ticketLinks(legs){
     seen.set(seller.url, SELLER_NAME[seller.name] || seller.name);
   });
   const links = [...seen].map(([url, name]) => `<a href="${esc(url.replace(/^http:/, "https:"))}" target="_blank" rel="noopener">${esc(name)} ↗</a>`).join("");
-  return `<div class="tickets"><span class="lbl">Billett</span><a class="main" href="https://entur.no" target="_blank" rel="noopener">Entur ↗</a>${links}</div>
-    <p class="small" style="margin:6px 0 0">Entur-appen selger billett til det meste av buss, tog, trikk og båt. Fly kjøpes hos flyselskapet.</p>`;
+  // Entur viser ikke fly, så en reise med fly deles i bakkedeler med hver sin Entur-lenke
+  const parts = []; let cur = [];
+  legs.forEach(l => { if (l.mode === "air") { parts.push(cur); cur = []; } else cur.push(l); });
+  parts.push(cur);
+  const ground = parts.filter(p => p.some(l => l.mode !== "foot"));
+  const hasAir = legs.some(l => l.mode === "air");
+  const entur = ground.map(p => {
+    const a = p[0], b = p[p.length-1];
+    const label = hasAir ? `Entur: ${shortName(a.fromPlace.name)} → ${shortName(b.toPlace.name)}` : "Kjøp i Entur";
+    return `<a class="main" href="${esc(enturUrl(a.fromPlace, b.toPlace, a.expectedStartTime))}" target="_blank" rel="noopener">${esc(label)} ↗</a>`;
+  }).join("");
+  return `<div class="tickets"><span class="lbl">Billett</span>${entur}${links}</div>
+    <p class="small" style="margin:6px 0 0">Entur-lenken åpner søket med samme fra, til og avgangstid${hasAir ? " for delene uten fly. Flybilletten kjøpes hos flyselskapet" : ""}. Selskapslenkene går til forsiden deres.</p>`;
+}
+const shortName = n => String(n || "").split(",")[0];
+function enturUrl(from, to, startIso){
+  const u = new URL("https://entur.no/reiseresultater");
+  u.searchParams.set("date", String(new Date(startIso).getTime() - 60000));
+  u.searchParams.set("tripMode", "oneway");
+  u.searchParams.set("timepickerMode", "departAfter");
+  const put = (pre, p) => {
+    const id = p.quay?.stopPlace?.id;
+    if (id) u.searchParams.set(pre + "Id", id);
+    u.searchParams.set(pre + "Label", p.name);
+    u.searchParams.set(pre + "Lat", p.latitude);
+    u.searchParams.set(pre + "Lon", p.longitude);
+  };
+  put("start", from); put("stop", to);
+  return u.toString();
 }
 
 /* Avinor-berikelse av fly-etapper */
