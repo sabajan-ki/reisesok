@@ -644,14 +644,16 @@ function sellerOf(l){
 }
 const SELLER_NAME = {"Nordland fylkeskommune":"Reis Nordland","Agder Kollektivtrafikk AS":"AKT","Tide AS":"Flybussen","Norled AS":"Norled","Fjord1 ASA":"Fjord1","Boreal Norge":"Boreal","Go-Ahead Norge AS":"Go-Ahead","ATB":"AtB"};
 /* Kjøpsliste: reisen delt i det som må kjøpes hvert sitt sted, i rekkefølge */
-/* vy.no selger Vy-tog og alle Vy Buss-ruter (ekspress og Torp-bussen), også samlet i ett kjøp (testet 26.09.26) */
+/* vy.no selger Vy-tog, alle Vy Buss-ruter og lokaltrafikk (Ruter, Farte, VKT) i samme handel (testet 26.09.26).
+   En bakkedel med Vy Buss blir derfor ett Vy-kjøp; Flybussen og FlixBus holdes utenfor (ikke testet hos Vy). */
 const isVyTrain = l => l.mode !== "air" && l.authority?.name === "Vy";
 const isVyBus = l => l.authority?.name === "Vy Buss";
 function purchases(legs){
   const transit = legs.filter(l => l.mode !== "foot");
   // bakkedeler mellom fly: inneholder en del Vy Buss, kjøpes Vy-togene i samme del også på vy.no
   const kinds = []; let part = [];
-  const flush = () => { const vyPart = part.some(isVyBus); part.forEach(l => kinds.push(isVyBus(l) || (vyPart && isVyTrain(l)) ? "vy" : (sellerOf(l)?.entur ? "entur" : "other"))); part = []; };
+  const notVy = l => !isVyBus(l) && sellerOf(l)?.entur === false; // Flybussen, FlixBus o.l.
+  const flush = () => { const vyPart = part.some(isVyBus); part.forEach(l => kinds.push(vyPart && !notVy(l) ? "vy" : (sellerOf(l)?.entur ? "entur" : "other"))); part = []; };
   transit.forEach(l => { if (l.mode === "air") { flush(); kinds.push("air"); } else part.push(l); });
   flush();
   const out = []; let cur = null;
@@ -698,7 +700,8 @@ function purchasePlan(legs, sig){
     let title, sub, open, openLabel, copy, alt = "";
     if (p.kind === "vy"){
       title = `Vy: ${modes} ${shortName(a.fromPlace.name)} → ${shortName(b.toPlace.name)}`;
-      sub = `${when} · ${p.legs.some(isVyBus) ? "tog og Vy-buss selges samlet på vy.no" : "vy.no"}`;
+      const others = [...new Set(p.legs.filter(l => !isVyTrain(l) && !isVyBus(l)).map(l => sellerOf(l)?.name).filter(Boolean))];
+      sub = `${when} · hele strekningen i én handel på vy.no${others.length ? ", også " + others.join(", ") : ""}`;
       open = vyUrl(a.fromPlace, b.toPlace, a.expectedStartTime); openLabel = "Åpne i Vy";
       copy = `${shortName(a.fromPlace.name)} → ${shortName(b.toPlace.name)}, ${when} (${modes})`;
     } else if (p.kind === "entur"){
@@ -708,7 +711,7 @@ function purchasePlan(legs, sig){
       title = `Entur: ${modes} ${fromName} → ${toName}`;
       sub = `${when}${cos ? " · " + cos : ""}`;
       open = enturUrl(fromP, toP, a.expectedStartTime); openLabel = "Åpne i Entur";
-      if (p.legs.every(isVyTrain)) alt = `<a href="${esc(vyUrl(a.fromPlace, b.toPlace, a.expectedStartTime))}" target="_blank" rel="noopener">eller Vy ↗</a>`;
+      if (p.legs.some(isVyTrain)) alt = `<a href="${esc(vyUrl(a.fromPlace, b.toPlace, a.expectedStartTime))}" target="_blank" rel="noopener">eller Vy ↗</a>`;
       copy = `${fromName} → ${toName}, ${when} (${modes})`;
     } else if (p.kind === "air"){
       const fi = iataFor(a.fromPlace.name), ti = iataFor(a.toPlace.name);
