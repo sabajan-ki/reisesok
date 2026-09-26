@@ -26,10 +26,10 @@ nye tider, status og gate. Tavla oppdateres hvert minutt.
 |-------|------------|--------|
 | [Entur](https://developer.entur.org) – Journey Planner og Geocoder | Reisesøk, stoppsøk og avgangstavler for all kollektivtrafikk i Norge, også ferjer og innenriksfly | Åpne data under [NLOD](https://data.norge.no/nlod/no/2.0) |
 | [Avinor](https://www.avinor.no) flydata, hentet via [allemannsdata.com](https://allemannsdata.com/wiki/kilder/avinor/) | Offisielle flytider, status og gate | Kilde: Avinor. Allemannsdata videreformidler dataene uten garanti for oppetid |
+| [torp.no](https://torp.no/avganger-og-ankomster/) | Gate for avganger fra Sandefjord lufthavn Torp, som Avinor-dataene mangler | Avgangstavla hentes hvert 10. minutt av en GitHub Actions-jobb (`scripts/torp.py`) og lagres som `torp.json` på grenen `torp-data` |
 
-Sanntid vises der operatøren sender det. For Torp mangler gate i datagrunnlaget, så den må
-sjekkes på [torp.no](https://torp.no/avganger-og-ankomster/). Utenlandsfly vises i flytavla,
-men er ikke med i reisesøket.
+Sanntid vises der operatøren sender det. Gate for Torp kan være opptil et kvarter gammel.
+Utenlandsfly vises i flytavla, men er ikke med i reisesøket.
 
 ## Personvern
 

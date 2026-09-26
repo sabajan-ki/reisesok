@@ -105,6 +105,12 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
 .badge{font:600 .85rem var(--f-mono);border-radius:4px;padding:2px 7px;color:#fff;background:var(--c,var(--m-other))}
 .leg .detail{font-size:.85rem;color:var(--muted);margin-top:3px}
 .leg .alert{font-size:.85rem;background:var(--late-bg);color:var(--late);border-radius:6px;padding:6px 8px;margin-top:6px}
+.tickets{border-top:1px solid var(--line);margin-top:10px;padding-top:10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.tickets .lbl{margin:0 6px 0 0}
+.tickets a{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:.88rem;color:var(--accent);text-decoration:none;min-height:36px;background:var(--bg)}
+.tickets a:hover{border-color:var(--accent)}
+.tickets a.main{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.dep .dest a{color:inherit}
 .leg .flight{font-size:.85rem;background:var(--soft);border-radius:6px;padding:6px 8px;margin-top:6px}
 details.stops{font-size:.85rem;color:var(--muted);margin-top:4px}
 details.stops summary{cursor:pointer}
@@ -235,11 +241,11 @@ footer{margin-top:28px;font-size:.78rem;color:var(--muted);border-top:1px solid 
     </div>
   </form>
   <div id="flyOut"></div>
-  <p class="hint">Offisielle flytider og status fra Avinor, oppdatert hvert minutt. Gjelder Avinors 43 lufthavner og Sandefjord lufthavn Torp. For Torp mangler gate i datagrunnlaget; den står på torp.no.</p>
+  <p class="hint">Offisielle flytider og status fra Avinor, oppdatert hvert minutt. Gjelder Avinors 43 lufthavner og Sandefjord lufthavn Torp. Gate for Torp hentes fra torp.no og kan være opptil et kvarter gammel.</p>
 </section>
 
 <footer>
-  Data: <a href="https://developer.entur.org" target="_blank" rel="noopener">Entur</a> (alle kollektivruter i Norge, NLOD) og Avinor via <a href="https://allemannsdata.com/wiki/kilder/avinor/" target="_blank" rel="noopener">allemannsdata.com</a>. Sanntid der operatøren sender det. Billetter kjøpes i Entur-appen eller hos operatøren.
+  Data: <a href="https://developer.entur.org" target="_blank" rel="noopener">Entur</a> (alle kollektivruter i Norge, NLOD) og Avinor via <a href="https://allemannsdata.com/wiki/kilder/avinor/" target="_blank" rel="noopener">allemannsdata.com</a>, gate for Torp fra <a href="https://torp.no/avganger-og-ankomster/" target="_blank" rel="noopener">torp.no</a>. Sanntid der operatøren sender det. Billetter kjøpes i Entur-appen eller hos operatøren.
 </footer>
 </div>
 
@@ -249,6 +255,7 @@ const CLIENT = "sabajan-reisesok";
 const JP = "https://api.entur.io/journey-planner/v3/graphql";
 const GEO = "https://api.entur.io/geocoder/v1";
 const AVINOR = "https://allemannsdata.com/wiki/api/v1/kilder/avinor";
+const TORP = "https://raw.githubusercontent.com/sabajan-ki/reisesok/torp-data/torp.json"; // gater fra torp.no, hentes hvert 10. min av GitHub Actions
 
 const MODES = [
   {key:"bus",   name:"Buss",   api:["bus","coach"], css:"--m-bus"},
@@ -284,6 +291,7 @@ const AIRPORTS = [
  ["HOV","Ørsta-Volda lufthavn Hovden","ørsta|hovden"],["TRF","Sandefjord lufthavn Torp","sandefjord lufthavn|torp lufthavn"],["SDN","Sandane lufthavn Anda","sandane lufthavn|anda"]
 ];
 const AIRLINES = {SK:"SAS",DY:"Norwegian",D8:"Norwegian",WF:"Widerøe",FR:"Ryanair",W6:"Wizz Air",KL:"KLM",LH:"Lufthansa",AY:"Finnair",BA:"British Airways",AF:"Air France",TK:"Turkish Airlines",DX:"DAT",U2:"easyJet",LX:"Swiss",OS:"Austrian",SN:"Brussels Airlines",TP:"TAP",IB:"Iberia",VY:"Vueling",QR:"Qatar Airways",EK:"Emirates",FI:"Icelandair",BT:"airBaltic",LO:"LOT",EW:"Eurowings",DE:"Condor",X3:"TUI fly",BY:"TUI",PC:"Pegasus",HV:"Transavia",LM:"Loganair",N0:"Norse",DS:"easyJet",RC:"Atlantic Airways",SI:"Blue Islands",JU:"Air Serbia",A3:"Aegean",EI:"Aer Lingus",MT:"Enter Air",XQ:"SunExpress",TO:"Transavia France",W4:"Wizz Air Malta",L6:"Mauritania",E4:"Enter Air",V7:"Volotea",LTR:"Lufttransport (helikopter)",RK:"Ryanair"};
+const AIRLINE_URL = {SK:"https://www.sas.no",DY:"https://www.norwegian.no",D8:"https://www.norwegian.no",WF:"https://www.wideroe.no",FR:"https://www.ryanair.com/no/no",RK:"https://www.ryanair.com/no/no",W6:"https://wizzair.com",W4:"https://wizzair.com",W9:"https://wizzair.com",DX:"https://dat.dk",KL:"https://www.klm.no",LH:"https://www.lufthansa.com",AY:"https://www.finnair.com",BA:"https://www.britishairways.com",AF:"https://www.airfrance.no",TK:"https://www.turkishairlines.com",FI:"https://www.icelandair.com",BT:"https://www.airbaltic.com",LO:"https://www.lot.com",U2:"https://www.easyjet.com",LTR:"https://www.lufttransport.no"};
 const FLIGHT_STATUS = {A:["Landet","ok"],D:["Avreist","ok"],E:["Ny tid","late"],C:["Innstilt","bad"],N:["Ny info","late"]};
 function flightStatus(f){ // «Ny tid» med samme klokkeslett betyr i rute
   const c = f.status?.code; if (!c) return null;
@@ -417,7 +425,7 @@ const TRIP_Q = `query($from:Location!,$to:Location!,$dt:DateTime,$arriveBy:Boole
    legs{ mode transportSubmode distance duration realtime aimedStartTime expectedStartTime aimedEndTime expectedEndTime
     fromPlace{name quay{publicCode name}} toPlace{name quay{publicCode}}
     line{publicCode name presentation{colour textColour}}
-    operator{name} authority{name}
+    operator{name url} authority{name url}
     fromEstimatedCall{destinationDisplay{frontText} cancellation}
     situations{summary{value language} description{value language}}
     intermediateEstimatedCalls{quay{name} expectedDepartureTime}
@@ -527,8 +535,24 @@ function legsHtml(legs){
     if (!next || next.mode === "foot" && idx+1 === legs.length-1) {} // sluttpunkt vises under
   });
   const last = legs[legs.length-1];
+  const tk = ticketLinks(legs);
   h += `<div class="end"><div class="t">${hm(last.expectedEndTime)}</div><div></div><div><span class="stop">${esc(last.toPlace.name)}</span>${last.toPlace.quay?.publicCode ? ` <span class="small">plf. ${esc(last.toPlace.quay.publicCode)}</span>` : ""}</div></div>`;
+  h += tk;
   return h;
+}
+
+/* Billettlenker: selskapet som selger billetten (Enturs «authority»), for fly flyselskapet */
+const SELLER_NAME = {"Nordland fylkeskommune":"Reis Nordland","Agder Kollektivtrafikk AS":"AKT","Tide AS":"Flybussen","Norled AS":"Norled","Fjord1 ASA":"Fjord1","Boreal Norge":"Boreal","Go-Ahead Norge AS":"Go-Ahead","ATB":"AtB"};
+function ticketLinks(legs){
+  const seen = new Map();
+  legs.filter(l => l.mode !== "foot").forEach(l => {
+    const seller = l.mode === "air" ? (l.operator || l.authority) : (l.authority?.url ? l.authority : l.operator);
+    if (!seller?.name || !seller.url || seen.has(seller.url)) return;
+    seen.set(seller.url, SELLER_NAME[seller.name] || seller.name);
+  });
+  const links = [...seen].map(([url, name]) => `<a href="${esc(url.replace(/^http:/, "https:"))}" target="_blank" rel="noopener">${esc(name)} ↗</a>`).join("");
+  return `<div class="tickets"><span class="lbl">Billett</span><a class="main" href="https://entur.no" target="_blank" rel="noopener">Entur ↗</a>${links}</div>
+    <p class="small" style="margin:6px 0 0">Entur-appen selger billett til det meste av buss, tog, trikk og båt. Fly kjøpes hos flyselskapet.</p>`;
 }
 
 /* Avinor-berikelse av fly-etapper */
@@ -554,6 +578,20 @@ async function avinorFlights(iata, dir){
   flightCache[k] = {t:Date.now(), data:all};
   return all;
 }
+/* Avinor mangler gate for Torp; den hentes fra torp.no via torp.json */
+let torpCache = null;
+async function torpGates(){
+  if (torpCache && Date.now() - torpCache.t < 120000) return torpCache.map;
+  const r = await fetch(TORP, {cache:"no-store"}); const j = await r.json();
+  const map = {};
+  (j.departures || []).forEach(d => { if (d.gate) map[d.flight + "|" + d.date] = d.gate; });
+  torpCache = {t:Date.now(), map};
+  return map;
+}
+const osloDate = iso => new Date(iso).toLocaleDateString("sv-SE", {timeZone:"Europe/Oslo"});
+async function addTorpGates(flights){
+  try { const g = await torpGates(); flights.forEach(f => { if (!f.gate) f.gate = g[f.flight_id + "|" + osloDate(f.schedule_time)] || f.gate; }); } catch {}
+}
 async function enrichFlights(legsEl){
   for (const leg of legsEl.querySelectorAll('.leg[data-mode="air"]')){
     const box = leg.querySelector("[data-flight]"); if (!box || box.dataset.done) continue;
@@ -562,6 +600,7 @@ async function enrichFlights(legsEl){
     if (!from) { box.textContent = "Flyplassen er ikke en Avinor-lufthavn, så flightnummer og gate mangler."; continue; }
     try {
       const fl = await avinorFlights(from, "departures");
+      if (from === "TRF") await addTorpGates(fl);
       const aimed = new Date(leg.dataset.aimed).getTime();
       const cand = fl.filter(f => (!to || f.airport === to) && Math.abs(new Date(f.schedule_time).getTime() - aimed) <= 15*60000);
       const f = cand.sort((a,b) => Math.abs(new Date(a.schedule_time)-aimed) - Math.abs(new Date(b.schedule_time)-aimed))[0];
@@ -673,6 +712,7 @@ async function loadFlights(){
   try {
     const all = await avinorFlights(iata, dir);
     await resolveForeign([...new Set(all.map(f => f.airport))]);
+    if (iata === "TRF" && dir === "departures") await addTorpGates(all);
     if (my !== flySeq) return; // brukeren har byttet flyplass eller retning i mellomtiden
     flyData = all.filter(f => new Date(f.schedule_time) > Date.now() - 60*60000);
     renderFlights();
@@ -695,7 +735,7 @@ function renderFlights(){
      return `<div class="dep${f.status?.code === "C" ? " cancel" : ""}">
        <div class="t">${newTime ? hm(f.status.time) + `<s>${hm(f.schedule_time)}</s>` : hm(f.schedule_time)}</div>
        <span class="badge" style="--c:var(--m-air)">${esc(f.flight_id)}</span>
-       <div class="dest"><b>${esc(place)}</b><span>${esc(AIRLINES[f.airline] || f.airline)}${dateLabel(f.schedule_time) !== "i dag" ? " · " + esc(dateLabel(f.schedule_time)) : ""}${f.area === "schengen" ? " · Schengen" : f.area === "international" ? " · Utland" : ""}</span></div>
+       <div class="dest"><b>${esc(place)}</b><span>${AIRLINE_URL[f.airline] ? `<a href="${AIRLINE_URL[f.airline]}" target="_blank" rel="noopener">${esc(AIRLINES[f.airline] || f.airline)}</a>` : esc(AIRLINES[f.airline] || f.airline)}${dateLabel(f.schedule_time) !== "i dag" ? " · " + esc(dateLabel(f.schedule_time)) : ""}${f.area === "schengen" ? " · Schengen" : f.area === "international" ? " · Utland" : ""}</span></div>
        <div class="right">${st ? `<span class="st ${st[1]}">${st[0]}${f.status.time && f.status.code !== "E" ? " " + hm(f.status.time) : ""}</span>` : ""}${f.gate ? `<b>Gate ${esc(f.gate)}</b>` : ""}${f.belt ? `<b>Bånd ${esc(f.belt)}</b>` : ""}</div>
      </div>`;}).join("")}</div>` : `<div class="status">Ingen fly i tidsrommet${q ? " som passer filteret" : ""}.</div>`}`;
 }
