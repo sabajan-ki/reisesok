@@ -550,7 +550,7 @@ function sellerLine(l){
 }
 /* Billettlenker: selskapet som selger billetten (Enturs «authority»), for fly flyselskapet */
 /* Selskap Entur ikke selger billett for (bekreftet på entur.no). Utvid lista når noe nytt dukker opp. */
-const NOT_IN_ENTUR = ["Vy Buss"];
+const NOT_IN_ENTUR = ["Vy Buss", "Tide AS", "Flybussen Connect", "FlixBus"]; // Tide AS = Flybussen i Enturs data
 function sellerOf(l){
   const s = l.mode === "air" ? (l.operator || l.authority) : (l.authority?.url ? l.authority : l.operator);
   if (!s?.name) return null;
