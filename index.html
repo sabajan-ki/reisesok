@@ -630,6 +630,7 @@ function legsHtml(legs, sig){
 function sellerLine(l){
   const sl = sellerOf(l); if (!sl) return "";
   const name = sl.url ? `<a href="${esc(sl.url)}" target="_blank" rel="noopener" style="color:var(--accent)">${esc(sl.name)}</a>` : esc(sl.name);
+  if (isVyBus(l)) return `<div class="detail">Billett: selges ikke i Entur, kjøp på <a href="https://www.vy.no" target="_blank" rel="noopener" style="color:var(--accent)">vy.no</a></div>`;
   const where = l.mode === "air" ? "kjøpes hos flyselskapet" : sl.entur ? "i Entur eller hos" : "selges ikke i Entur, kjøp hos";
   return `<div class="detail">Billett: ${l.mode === "air" ? name + ", " + where : where + " " + name}</div>`;
 }
@@ -643,17 +644,35 @@ function sellerOf(l){
 }
 const SELLER_NAME = {"Nordland fylkeskommune":"Reis Nordland","Agder Kollektivtrafikk AS":"AKT","Tide AS":"Flybussen","Norled AS":"Norled","Fjord1 ASA":"Fjord1","Boreal Norge":"Boreal","Go-Ahead Norge AS":"Go-Ahead","ATB":"AtB"};
 /* Kjøpsliste: reisen delt i det som må kjøpes hvert sitt sted, i rekkefølge */
+/* vy.no selger Vy-tog og alle Vy Buss-ruter (ekspress og Torp-bussen), også samlet i ett kjøp (testet 26.09.26) */
+const isVyTrain = l => l.mode !== "air" && l.authority?.name === "Vy";
+const isVyBus = l => l.authority?.name === "Vy Buss";
 function purchases(legs){
+  const transit = legs.filter(l => l.mode !== "foot");
+  // bakkedeler mellom fly: inneholder en del Vy Buss, kjøpes Vy-togene i samme del også på vy.no
+  const kinds = []; let part = [];
+  const flush = () => { const vyPart = part.some(isVyBus); part.forEach(l => kinds.push(isVyBus(l) || (vyPart && isVyTrain(l)) ? "vy" : (sellerOf(l)?.entur ? "entur" : "other"))); part = []; };
+  transit.forEach(l => { if (l.mode === "air") { flush(); kinds.push("air"); } else part.push(l); });
+  flush();
   const out = []; let cur = null;
-  legs.forEach(l => {
-    if (l.mode === "foot") return;
-    const sl = sellerOf(l);
-    const kind = l.mode === "air" ? "air" : (sl && sl.entur ? "entur" : "other");
-    const key = kind === "entur" ? "entur" : kind + "|" + (sl?.raw || "");
+  transit.forEach((l, i) => {
+    const kind = kinds[i], sl = sellerOf(l);
+    const key = kind === "entur" || kind === "vy" ? kind : kind + "|" + (sl?.raw || "");
     if (cur && cur.key === key && kind !== "air") cur.legs.push(l);
     else { cur = {key, kind, seller:sl, legs:[l]}; out.push(cur); }
   });
   return out;
+}
+function vyUrl(from, to, startIso){
+  const u = new URL("https://www.vy.no/se-reiseforslag");
+  u.searchParams.set("from", from.name); u.searchParams.set("to", to.name);
+  const fid = from.quay?.stopPlace?.id, tid = to.quay?.stopPlace?.id;
+  if (fid) u.searchParams.set("fromExternalId", "NSR:" + fid);
+  if (tid) u.searchParams.set("toExternalId", "NSR:" + tid);
+  u.searchParams.set("fromPosition", `${from.latitude},${from.longitude}`);
+  u.searchParams.set("toPosition", `${to.latitude},${to.longitude}`);
+  u.searchParams.set("fromDateTime", new Date(new Date(startIso).getTime() - 60000).toISOString());
+  return u.toString();
 }
 const AIRLINE_CODE = {"SAS":"SK","Widerøe":"WF","Norwegian":"DY","Ryanair":"FR","DAT":"DX"};
 function airlineSearchUrl(code, from, to, iso){
@@ -676,14 +695,20 @@ function purchasePlan(legs, sig){
     const toName = shortName(i === ps.length-1 ? legs[legs.length-1].toPlace.name : b.toPlace.name);
     const modes = [...new Set(p.legs.map(l => (SUBMODE_NAME[l.transportSubmode] || MODE_NAME[l.mode]).toLowerCase()))].join(" og ");
     const when = `${dateNo(a.expectedStartTime)} kl. ${hm(a.expectedStartTime)}–${hm(b.expectedEndTime)}`;
-    let title, sub, open, openLabel, copy;
-    if (p.kind === "entur"){
+    let title, sub, open, openLabel, copy, alt = "";
+    if (p.kind === "vy"){
+      title = `Vy: ${modes} ${shortName(a.fromPlace.name)} → ${shortName(b.toPlace.name)}`;
+      sub = `${when} · ${p.legs.some(isVyBus) ? "tog og Vy-buss selges samlet på vy.no" : "vy.no"}`;
+      open = vyUrl(a.fromPlace, b.toPlace, a.expectedStartTime); openLabel = "Åpne i Vy";
+      copy = `${shortName(a.fromPlace.name)} → ${shortName(b.toPlace.name)}, ${when} (${modes})`;
+    } else if (p.kind === "entur"){
       const fromP = i === 0 ? legs[0].fromPlace : a.fromPlace;
       const toP = i === ps.length-1 ? legs[legs.length-1].toPlace : b.toPlace;
       const cos = [...new Set(p.legs.map(l => sellerOf(l)?.name).filter(Boolean))].join(", ");
       title = `Entur: ${modes} ${fromName} → ${toName}`;
       sub = `${when}${cos ? " · " + cos : ""}`;
       open = enturUrl(fromP, toP, a.expectedStartTime); openLabel = "Åpne i Entur";
+      if (p.legs.every(isVyTrain)) alt = `<a href="${esc(vyUrl(a.fromPlace, b.toPlace, a.expectedStartTime))}" target="_blank" rel="noopener">eller Vy ↗</a>`;
       copy = `${fromName} → ${toName}, ${when} (${modes})`;
     } else if (p.kind === "air"){
       const fi = iataFor(a.fromPlace.name), ti = iataFor(a.toPlace.name);
@@ -718,7 +743,7 @@ function purchasePlan(legs, sig){
     return `${warn ? `<li>${warn}</li>` : ""}<li class="buy${done[id] ? " done" : ""}">
       <input type="checkbox" data-kjopt="${esc(id)}" ${done[id] ? "checked" : ""} aria-label="Kjøpt: ${esc(title)}">
       <div><div class="buy-title">${esc(title)}</div><div class="buy-sub">${sub}</div></div>
-      <div class="buy-actions">${open ? `<a class="main" href="${esc(open)}" target="_blank" rel="noopener">${esc(openLabel)} ↗</a>` : ""}<button type="button" ${copyAttr}>Kopier reisedata</button></div>
+      <div class="buy-actions">${open ? `<a class="main" href="${esc(open)}" target="_blank" rel="noopener">${esc(openLabel)} ↗</a>` : ""}${alt}<button type="button" ${copyAttr}>Kopier reisedata</button></div>
     </li>`;
   }).join("");
   const n = ps.length;
