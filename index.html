@@ -118,6 +118,8 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
 .buy-actions{grid-column:2;display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
 .buy-actions a,.buy-actions button,.tripbar button{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:999px;padding:6px 12px;font:inherit;font-size:.88rem;color:var(--accent);text-decoration:none;min-height:36px;background:var(--panel);cursor:pointer}
 .buy-actions a.main{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.warns{display:grid;gap:6px}
+.warn a{color:inherit;text-decoration:underline}
 .warn{grid-column:1/-1;font-size:.85rem;background:var(--late-bg);color:var(--late);border-radius:8px;padding:8px 10px}
 .tripbar{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
 .sharebar{display:flex;justify-content:flex-end;gap:6px;margin-top:12px}
@@ -187,6 +189,7 @@ footer{margin-top:28px;font-size:.78rem;color:var(--muted);border-top:1px solid 
         <div class="field">
           <label class="lbl" for="from">Fra</label>
           <input type="search" id="from" placeholder="Sted, adresse eller holdeplass" required>
+          <button type="button" class="linkbtn" id="useGeo">Bruk min posisjon som fra</button>
         </div>
         <div class="field">
           <label class="lbl" for="to">Til</label>
@@ -208,9 +211,6 @@ footer{margin-top:28px;font-size:.78rem;color:var(--muted);border-top:1px solid 
     <div>
       <label class="lbl">Transportmidler</label>
       <div class="chips" id="modeChips"></div>
-    </div>
-    <div class="row" style="align-items:center">
-      <button type="button" class="linkbtn" id="useGeo" style="flex:0 0 auto">Bruk min posisjon som fra</button>
     </div>
     <button class="go" type="submit">Finn reise</button>
     <div id="recentWrap" hidden>
@@ -573,7 +573,7 @@ function tripCard(p, i){
   const kinds = [...new Set(transit.map(l => SUBMODE_NAME[l.transportSubmode] || MODE_NAME[l.mode]))];
   kinds.forEach(k => tags.push(`<span class="tag">${esc(k)}</span>`));
   if (p.walkDistance > 50) tags.push(`<span class="tag">Gå ${Math.round(p.walkDistance)} m</span>`);
-  if (hasShortSeparateTransfer(p)) tags.push(`<span class="tag late">Kort bytte, separate billetter</span>`);
+  if (hasShortSeparateTransfer(p)) tags.push(`<span class="tag late">Kort bytte</span>`);
   const nBuy = purchases(legs).length; if (nBuy > 1) tags.push(`<span class="tag">${nBuy} kjøp</span>`);
   const dayNote = dateLabel(p.expectedStartTime) !== "i dag" ? `<s>${esc(dateLabel(p.expectedStartTime))}</s>` : "";
   return `<article class="trip">
@@ -630,13 +630,24 @@ function legsHtml(legs, sig){
 function sellerLine(l){
   const sl = sellerOf(l); if (!sl) return "";
   const name = sl.url ? `<a href="${esc(sl.url)}" target="_blank" rel="noopener" style="color:var(--accent)">${esc(sl.name)}</a>` : esc(sl.name);
-  if (isVyBus(l)) return `<div class="detail">Billett: selges ikke i Entur, kjøp på <a href="https://www.vy.no" target="_blank" rel="noopener" style="color:var(--accent)">vy.no</a></div>`;
-  const where = l.mode === "air" ? "kjøpes hos flyselskapet" : sl.entur ? "i Entur eller hos" : "selges ikke i Entur, kjøp hos";
-  return `<div class="detail">Billett: ${l.mode === "air" ? name + ", " + where : where + " " + name}</div>`;
+  const check = `(<a href="${esc(enturUrl(l.fromPlace, l.toPlace, l.expectedStartTime))}" target="_blank" rel="noopener" style="color:var(--accent)">se Entur</a>)`;
+  if (isVyBus(l)) return `<div class="detail">Billett: selges ikke i Entur ${check}, kjøp på <a href="https://www.vy.no" target="_blank" rel="noopener" style="color:var(--accent)">vy.no</a></div>`;
+  if (l.mode === "air") return `<div class="detail">Billett: ${name}, kjøpes hos flyselskapet</div>`;
+  return `<div class="detail">Billett: ${sl.entur ? "i Entur eller hos " + name : `selges ikke i Entur ${check}, kjøp hos ${name}`}</div>`;
 }
 /* Billettlenker: selskapet som selger billetten (Enturs «authority»), for fly flyselskapet */
-/* Selskap Entur ikke selger billett for (bekreftet på entur.no). Utvid lista når noe nytt dukker opp. */
-const NOT_IN_ENTUR = ["Vy Buss", "Tide AS", "Flybussen Connect", "FlixBus"]; // Tide AS = Flybussen i Enturs data
+/* Selskap Entur ikke selger billett for. Hvert navn er sjekket på entur.no 26.09.26, der reisen står som
+   «Billetter selges ikke av Entur»: Vy Buss (VY190, S174, FB11), Tide AS (Flybussen Bergen FB50),
+   Unibuss (OSL Ekspressen FB10). Flybussen Connect og FlixBus SELGES i Entur og står derfor ikke her. */
+const NOT_IN_ENTUR = ["Vy Buss", "Tide AS", "Unibuss"];
+/* Kilder siden viser når den påstår noe brukeren kan tvile på */
+const SRC = {
+  vyTogBuss: ["https://www.vy.no/kundeservice/sporsmal-og-svar/jeg-har-en-togbillett-kan-jeg-bruke-den-pa-buss", "Vy: togbillett gjelder ikke på buss"],
+  vyPartner: ["https://www.vy.no/kjop-billetter/samarbeidspartnere", "Vy: lokalbussbilletter i Vy-appen"],
+  vyOvergang: ["https://www.vy.no/vilkar-og-personvern/overgangsregler", "Vy: overgangsregler og reisegaranti"],
+};
+const srcLink = (k, text = "kilde") => `<a href="${SRC[k][0]}" target="_blank" rel="noopener" title="${esc(SRC[k][1])}" style="color:var(--accent)">${text}</a>`;
+const LONG_DISTANCE = ["Vy", "Vy Buss", "Go-Ahead Norge AS", "SJ Nord", "SJ NORD", "Flytoget", "NOR-WAY Bussekspress", "FlixBus"];
 function sellerOf(l){
   const s = l.mode === "air" ? (l.operator || l.authority) : (l.authority?.url ? l.authority : l.operator);
   if (!s?.name) return null;
@@ -705,7 +716,7 @@ function purchasePlan(legs, sig){
     if (p.kind === "vy"){
       title = `Vy: ${modes} ${shortName(a.fromPlace.name)} → ${shortName(b.toPlace.name)}`;
       const others = [...new Set(p.legs.filter(l => !isVyTrain(l) && !isVyBus(l)).map(l => sellerOf(l)?.name).filter(Boolean))];
-      sub = `${when} · ${others.length ? `én handel på vy.no, med egen ${others.join("- og ")}-billett for bussen (<a href="${VY_SOURCE}" target="_blank" rel="noopener" style="color:var(--accent)">Vy om dette</a>)` : "én handel på vy.no"}`;
+      sub = `${when} · ${others.length ? `én handel på vy.no, med egen ${others.join("- og ")}-billett for bussen (${srcLink("vyPartner")}). Togbilletten alene gjelder ikke på bussen (${srcLink("vyTogBuss")}).` : "én handel på vy.no"}`;
       open = vyUrl(a.fromPlace, b.toPlace, a.expectedStartTime); openLabel = "Åpne i Vy";
       copy = `${shortName(a.fromPlace.name)} → ${shortName(b.toPlace.name)}, ${when} (${modes})`;
     } else if (p.kind === "entur"){
@@ -734,20 +745,14 @@ function purchasePlan(legs, sig){
       open = p.seller?.url; openLabel = `Til ${name}`;
       copy = `${fromName} → ${toName}, ${when}`;
     }
-    // kort bytte mellom separate billetter
-    let warn = "";
-    if (i > 0){
-      const prev = ps[i-1].legs[ps[i-1].legs.length-1];
-      const gap = Math.round((new Date(a.expectedStartTime) - new Date(prev.expectedEndTime)) / 60000);
-      const need = prev.mode === "air" ? 45 : a.mode === "air" ? 60 : 10;
-      if (gap < need){
-        const why = prev.mode === "air" ? "fra landing til neste avgang" : a.mode === "air" ? "fra ankomst til avgang, med innsjekk og sikkerhetskontroll" : "til neste avgang";
-        warn = `<div class="warn">⚠ Bare ${gap} min ${why}, og billettene kjøpes hver for seg. Blir du forsinket, gjelder ikke den neste billetten automatisk på en senere avgang.</div>`;
-      }
-    }
+    // korte bytter inn til og inne i dette kjøpet
+    const pairs = [];
+    if (i > 0) pairs.push([ps[i-1].legs[ps[i-1].legs.length-1], a, true]);
+    p.legs.slice(1).forEach((l, k) => pairs.push([p.legs[k], l, false]));
+    const warn = pairs.map(([prev, next, separate]) => transferWarning(prev, next, separate)).filter(Boolean).join("");
     const id = `${sig}|${i}`;
     const copyAttr = typeof copy === "string" ? `data-copy="${esc(copy)}"` : `data-copy="${esc(copy.text)}" data-copyslot="${esc(copy.slot)}"`;
-    return `${warn ? `<li>${warn}</li>` : ""}<li class="buy${done[id] ? " done" : ""}">
+    return `${warn ? `<li class="warns">${warn}</li>` : ""}<li class="buy${done[id] ? " done" : ""}">
       <input type="checkbox" data-kjopt="${esc(id)}" ${done[id] ? "checked" : ""} aria-label="Kjøpt: ${esc(title)}">
       <div><div class="buy-title">${esc(title)}</div><div class="buy-sub">${sub}</div></div>
       <div class="buy-actions">${open ? `<a class="main" href="${esc(open)}" target="_blank" rel="noopener">${esc(openLabel)} ↗</a>` : ""}${alt}<button type="button" ${copyAttr}>Kopier reisedata</button></div>
@@ -756,7 +761,33 @@ function purchasePlan(legs, sig){
   const n = ps.length;
   return `<div class="plan"><h3>Kjøpsliste <span>${n === 1 ? "Ett kjøp" : n + " kjøp"} · kryss av etter hvert</span></h3><ol>${items}</ol>
     <div class="tripbar"><button type="button" data-ics>Legg i kalenderen</button></div>
-    <p class="small" style="margin:8px 0 0">Entur-lenkene åpner søket med samme fra, til og tid. Står det «Billett ikke tilgjengelig» hos Entur, kjøper du den delen hos selskapet ved etappen over.${ps.some(p => p.kind === "vy") || legs.some(isVyTrain) ? ` En togbillett fra Vy gjelder ikke på buss, men Vy selger lokalbussbilletten i samme kjøp for Ruter, Farte, VKT og Østfold kollektivtrafikk (<a href="${VY_SOURCE}" target="_blank" rel="noopener" style="color:var(--accent)">kilde: vy.no</a>).` : ""}</p></div>`;
+    <p class="small" style="margin:8px 0 0">Entur-lenkene åpner søket med samme fra, til og tid. Står det «Billetter selges ikke av Entur» der, kjøper du den delen hos selskapet ved etappen over.${ps.some(p => p.kind === "vy") || legs.some(isVyTrain) ? ` En togbillett fra Vy gjelder ikke på buss (${srcLink("vyTogBuss")}), men Vy selger lokalbussbilletten i samme kjøp for Ruter, Farte, VKT og Østfold kollektivtrafikk (${srcLink("vyPartner")}).` : ""}</p></div>`;
+}
+
+/* Varsel om korte bytter. Tersklene følger Vys overgangsregler der de finnes. */
+function transferWarning(prev, next, separate){
+  const gap = Math.round((new Date(next.expectedStartTime) - new Date(prev.expectedEndTime)) / 60000);
+  const local = l => !LONG_DISTANCE.includes(l.authority?.name) && l.mode !== "air";
+  if (next.mode === "air"){
+    const bus = prev.mode === "bus" || prev.mode === "coach";
+    const need = bus ? 90 : 60;
+    if (gap >= need) return "";
+    return `<div class="warn">⚠ Bare ${gap} min fra ankomst til flyavgang. Vy anbefaler ${bus ? "én time" : "minst 30 min"} ekstra i tillegg til flyselskapets innsjekkingstid, og dekker ikke utgifter hvis du velger kortere tid (${srcLink("vyOvergang")}).</div>`;
+  }
+  if (prev.mode === "air"){
+    if (gap >= 45) return "";
+    return `<div class="warn">⚠ Bare ${gap} min fra landing til neste avgang. Regn med tid til bagasje og å gå ut av terminalen. Flybilletten og billetten videre er separate, så blir flyet forsinket, må du selv ordne ny avgang. (Grensen på 45 min er sidens egen tommelfingerregel.)</div>`;
+  }
+  const vyBus = l => l.authority?.name === "Vy Buss", vyTrain = l => l.authority?.name === "Vy" && l.mode === "rail";
+  if (vyBus(prev) && vyBus(next) && prev.mode === "coach" && next.mode === "coach"){
+    if (gap >= 30) return "";
+    return `<div class="warn">⚠ Bare ${gap} min mellom to ekspressbusser. Vy sier du må regne minimum 30 minutter, ellers får du ikke dekket utlegg hvis du mister bussen (${srcLink("vyOvergang")}).</div>`;
+  }
+  if (gap >= 10) return "";
+  if ((vyBus(prev) && vyTrain(next)) || (vyTrain(prev) && vyBus(next))) return `<div class="warn">⚠ Bare ${gap} min mellom tog og buss. Vy har som hovedregel ingen korrespondansegaranti mellom tog og buss, bare på noen få navngitte strekninger (${srcLink("vyOvergang")}).</div>`;
+  if (local(prev) || local(next)) return `<div class="warn">⚠ Bare ${gap} min til byttet med lokaltrafikk. Vy gir ingen reisegaranti på reiser med lokale selskaper, så du har selv ansvaret for å rekke overgangen (${srcLink("vyOvergang")}).</div>`;
+  if (separate) return `<div class="warn">⚠ Bare ${gap} min til neste avgang, og billettene kjøpes hver for seg. Da gjelder ingen felles reisegaranti. Vy gir overgangsgaranti bare på gjennomgående togbillett (${srcLink("vyOvergang")}).</div>`;
+  return "";
 }
 
 /* Kalenderfil for hele reisen */
