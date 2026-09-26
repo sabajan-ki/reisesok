@@ -105,6 +105,24 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
 .badge{font:600 .85rem var(--f-mono);border-radius:4px;padding:2px 7px;color:#fff;background:var(--c,var(--m-other))}
 .leg .detail{font-size:.85rem;color:var(--muted);margin-top:3px}
 .leg .alert{font-size:.85rem;background:var(--late-bg);color:var(--late);border-radius:6px;padding:6px 8px;margin-top:6px}
+.plan{border-top:1px solid var(--line);margin-top:10px;padding-top:10px}
+.plan h3{font:700 1.05rem var(--f-disp);letter-spacing:.04em;text-transform:uppercase;margin:0 0 8px;display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap}
+.plan h3 span{font:400 .85rem var(--f-body);letter-spacing:0;text-transform:none;color:var(--muted)}
+.plan ol{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.buy{display:grid;grid-template-columns:28px 1fr;gap:4px 10px;align-items:start;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.buy input[type=checkbox]{width:22px;height:22px;margin:2px 0 0;accent-color:var(--accent)}
+.buy.done{opacity:.6}
+.buy.done .buy-title{text-decoration:line-through}
+.buy-title{font-weight:700}
+.buy-sub{font-size:.85rem;color:var(--muted)}
+.buy-actions{grid-column:2;display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.buy-actions a,.buy-actions button,.tripbar button{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:999px;padding:6px 12px;font:inherit;font-size:.88rem;color:var(--accent);text-decoration:none;min-height:36px;background:var(--panel);cursor:pointer}
+.buy-actions a.main{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.warn{grid-column:1/-1;font-size:.85rem;background:var(--late-bg);color:var(--late);border-radius:8px;padding:8px 10px}
+.tripbar{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.sharebar{display:flex;justify-content:flex-end;gap:6px;margin-top:12px}
+.sharebar button{border:1px solid var(--line);background:var(--panel);color:var(--accent);border-radius:999px;padding:6px 12px;font:inherit;font-size:.88rem;cursor:pointer;min-height:36px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:.9rem;z-index:50}
 .tickets{border-top:1px solid var(--line);margin-top:10px;padding-top:10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .tickets .lbl{margin:0 6px 0 0}
 .tickets a{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:.88rem;color:var(--accent);text-decoration:none;min-height:36px;background:var(--bg)}
@@ -374,7 +392,7 @@ function attachAC(input, {stopsOnly=false, onPick}){
   input.addEventListener("blur", () => setTimeout(close, 120));
   return { pickFirst: async () => { if (input._place) return input._place; const q = input.value.trim(); if (!q) return null; const r = await geocode(q, stopsOnly); if (r[0]) { pick(r[0]); return r[0]; } return null; } };
 }
-const toLoc = p => p.id && (p.id.startsWith("NSR:") ) ? {place:p.id, name:p.name} : {coordinates:{latitude:p.lat, longitude:p.lon}, name:p.name};
+const toLoc = p => p.id && p.id.startsWith("NSR:") ? {place:p.id, name:p.name} : {coordinates:{latitude:p.lat, longitude:p.lon}, name:p.name};
 
 /* ---------- faner ---------- */
 function showTab(name){
@@ -458,8 +476,10 @@ async function runTrip(cursor, back = false){
   }
   const tp = d.trip.tripPatterns.slice().sort((a,b) => new Date(a.expectedStartTime) - new Date(b.expectedStartTime));
   if (!tp.length) { out.innerHTML = `<div class="status">Ingen reiser funnet det neste døgnet med disse valgene. Prøv et annet tidspunkt eller slå på flere transportmidler.</div>`; return; }
-  out.innerHTML = `<div class="results">${tp.map((p,i) => tripCard(p,i)).join("")}</div>
+  currentTrips = tp;
+  out.innerHTML = `<div class="sharebar"><button type="button" id="shareBtn">Del søket</button></div><div class="results">${tp.map((p,i) => tripCard(p,i)).join("")}</div>
     <div class="pager"><button type="button" id="prevP" ${d.trip.previousPageCursor ? "" : "disabled"}>← Tidligere</button><button type="button" id="nextP" ${d.trip.nextPageCursor ? "" : "disabled"}>Senere →</button></div>`;
+  $("#shareBtn").onclick = shareSearch;
   $("#prevP").onclick = () => runTrip(d.trip.previousPageCursor, true).catch(showTripErr);
   $("#nextP").onclick = () => runTrip(d.trip.nextPageCursor).catch(showTripErr);
   out.querySelectorAll(".trip>button.head").forEach(b => b.addEventListener("click", () => {
@@ -468,8 +488,71 @@ async function runTrip(cursor, back = false){
   }));
   const first = out.querySelector(".trip>button.head"); if (first) first.click();
 }
+let currentTrips = [];
+/* hendelser i kjøpslista (én lytter for hele resultatlista) */
+$("#tripOut").addEventListener("change", e => {
+  const id = e.target.dataset?.kjopt; if (!id) return;
+  const done = store.get("kjopt", {});
+  if (e.target.checked) done[id] = Date.now(); else delete done[id];
+  // rydd bort avkrysninger eldre enn 30 dager
+  Object.keys(done).forEach(k => { if (Date.now() - done[k] > 30*864e5) delete done[k]; });
+  store.set("kjopt", done);
+  e.target.closest(".buy").classList.toggle("done", e.target.checked);
+});
+$("#tripOut").addEventListener("click", e => {
+  const c = e.target.closest("[data-copy]");
+  if (c){
+    let text = c.dataset.copy;
+    const f = c.dataset.copyslot && FOUND_FLIGHT[c.dataset.copyslot];
+    if (f) text = `${f.flight_id} (${AIRLINES[f.airline] || f.airline}) ` + text;
+    copyText(text); return;
+  }
+  if (e.target.closest("[data-ics]")){
+    const head = e.target.closest(".trip").querySelector(".head");
+    const p = currentTrips[+head.dataset.i];
+    const blob = new Blob([icsFor(p)], {type:"text/calendar"});
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = `reise-${osloDate(p.expectedStartTime).slice(2).split("-").reverse().join("")}.ics`;
+    document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  }
+});
+
+/* Del søket: lenke som åpner siden med samme fra, til og tid */
+function shareUrl(){
+  const u = new URL(location.href.split("?")[0].split("#")[0]);
+  const put = (pre, loc) => {
+    if (loc.place) u.searchParams.set(pre + "Id", loc.place);
+    if (loc.coordinates){ u.searchParams.set(pre + "Lat", loc.coordinates.latitude); u.searchParams.set(pre + "Lon", loc.coordinates.longitude); }
+    u.searchParams.set(pre, loc.name || "");
+  };
+  put("fra", lastQuery.from); put("til", lastQuery.to);
+  u.searchParams.set("tid", $("#when").value || inputNow());
+  if (lastQuery.arriveBy) u.searchParams.set("framme", "1");
+  return u.toString();
+}
+async function shareSearch(){
+  const url = shareUrl();
+  if (navigator.share){ try { await navigator.share({title:"Reisesøk", url}); return; } catch {} }
+  copyText(url);
+}
+function loadFromUrl(){
+  const q = new URLSearchParams(location.search);
+  if (!q.get("fra") || !q.get("til")) return false;
+  const place = pre => ({ id: q.get(pre + "Id") || "", name: q.get(pre), lat: +q.get(pre + "Lat") || 0, lon: +q.get(pre + "Lon") || 0, cats: [] });
+  const f = place("fra"), t = place("til");
+  if (!f.id && !f.lat || !t.id && !t.lat) return false;
+  $("#from").value = f.name; $("#from")._place = f; $("#to").value = t.name; $("#to")._place = t;
+  if (q.get("tid")) $("#when").value = q.get("tid");
+  if (q.get("framme") === "1") $("#arrBtn").click();
+  showTab("reise");
+  $("#tripForm").requestSubmit();
+  return true;
+}
+
 function showTripErr(err){ $("#tripOut").insertAdjacentHTML("beforeend", `<div class="err">${esc(err.message)}</div>`); }
 
+const tripSig = p => { const t = p.legs.filter(l => l.mode !== "foot"); return t.map(l => (l.line?.publicCode || l.mode) + "@" + l.aimedStartTime).join(">"); };
+function hasShortSeparateTransfer(p){ return /class="warn"/.test(purchasePlan(p.legs, "x")); }
 function tripCard(p, i){
   const legs = p.legs, transit = legs.filter(l => l.mode !== "foot");
   const changes = Math.max(0, transit.length - 1);
@@ -490,6 +573,8 @@ function tripCard(p, i){
   const kinds = [...new Set(transit.map(l => SUBMODE_NAME[l.transportSubmode] || MODE_NAME[l.mode]))];
   kinds.forEach(k => tags.push(`<span class="tag">${esc(k)}</span>`));
   if (p.walkDistance > 50) tags.push(`<span class="tag">Gå ${Math.round(p.walkDistance)} m</span>`);
+  if (hasShortSeparateTransfer(p)) tags.push(`<span class="tag late">Kort bytte, separate billetter</span>`);
+  const nBuy = purchases(legs).length; if (nBuy > 1) tags.push(`<span class="tag">${nBuy} kjøp</span>`);
   const dayNote = dateLabel(p.expectedStartTime) !== "i dag" ? `<s>${esc(dateLabel(p.expectedStartTime))}</s>` : "";
   return `<article class="trip">
     <button class="head" type="button" data-i="${i}" aria-expanded="false">
@@ -499,10 +584,10 @@ function tripCard(p, i){
       <span class="bar">${bar}</span>
       <span class="tags">${tags.join("")}</span>
     </button>
-    <div class="legs" hidden>${legsHtml(legs)}</div>
+    <div class="legs" hidden>${legsHtml(legs, tripSig(p))}</div>
   </article>`;
 }
-function legsHtml(legs){
+function legsHtml(legs, sig){
   let h = "";
   legs.forEach((l, idx) => {
     const cvar = MODE_CSS[l.mode] || "--m-other";
@@ -536,7 +621,7 @@ function legsHtml(legs){
     if (!next || next.mode === "foot" && idx+1 === legs.length-1) {} // sluttpunkt vises under
   });
   const last = legs[legs.length-1];
-  const tk = ticketLinks(legs);
+  const tk = purchasePlan(legs, sig);
   h += `<div class="end"><div class="t">${hm(last.expectedEndTime)}</div><div></div><div><span class="stop">${esc(last.toPlace.name)}</span>${last.toPlace.quay?.publicCode ? ` <span class="small">plf. ${esc(last.toPlace.quay.publicCode)}</span>` : ""}</div></div>`;
   h += tk;
   return h;
@@ -557,27 +642,116 @@ function sellerOf(l){
   return {name: SELLER_NAME[s.name] || s.name, raw: s.name, url: s.url ? s.url.replace(/^http:/, "https:") : null, entur: l.mode !== "air" && !NOT_IN_ENTUR.includes(s.name)};
 }
 const SELLER_NAME = {"Nordland fylkeskommune":"Reis Nordland","Agder Kollektivtrafikk AS":"AKT","Tide AS":"Flybussen","Norled AS":"Norled","Fjord1 ASA":"Fjord1","Boreal Norge":"Boreal","Go-Ahead Norge AS":"Go-Ahead","ATB":"AtB"};
-function ticketLinks(legs){
-  const seen = new Map();
-  legs.filter(l => l.mode !== "foot").forEach(l => {
+/* Kjøpsliste: reisen delt i det som må kjøpes hvert sitt sted, i rekkefølge */
+function purchases(legs){
+  const out = []; let cur = null;
+  legs.forEach(l => {
+    if (l.mode === "foot") return;
     const sl = sellerOf(l);
-    if (!sl?.url || seen.has(sl.url)) return;
-    seen.set(sl.url, sl.name);
+    const kind = l.mode === "air" ? "air" : (sl && sl.entur ? "entur" : "other");
+    const key = kind === "entur" ? "entur" : kind + "|" + (sl?.raw || "");
+    if (cur && cur.key === key && kind !== "air") cur.legs.push(l);
+    else { cur = {key, kind, seller:sl, legs:[l]}; out.push(cur); }
   });
-  const links = [...seen].map(([url, name]) => `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(name)} ↗</a>`).join("");
-  // Entur viser ikke fly, så en reise med fly deles i bakkedeler med hver sin Entur-lenke
-  const parts = []; let cur = [];
-  legs.forEach(l => { if (l.mode === "air") { parts.push(cur); cur = []; } else cur.push(l); });
-  parts.push(cur);
-  const ground = parts.filter(p => p.some(l => l.mode !== "foot" && sellerOf(l)?.entur !== false));
-  const hasAir = legs.some(l => l.mode === "air");
-  const entur = ground.map(p => {
-    const a = p[0], b = p[p.length-1];
-    const label = hasAir || ground.length > 1 ? `Entur: ${shortName(a.fromPlace.name)} → ${shortName(b.toPlace.name)}` : "Søk i Entur";
-    return `<a class="main" href="${esc(enturUrl(a.fromPlace, b.toPlace, a.expectedStartTime))}" target="_blank" rel="noopener">${esc(label)} ↗</a>`;
+  return out;
+}
+const AIRLINE_CODE = {"SAS":"SK","Widerøe":"WF","Norwegian":"DY","Ryanair":"FR","DAT":"DX"};
+function airlineSearchUrl(code, from, to, iso){
+  if (!from || !to) return null;
+  const d = osloDate(iso), [y, m, dd] = d.split("-");
+  if (code === "SK") return `https://www.flysas.com/no-no/book/flights?search=OW_${from}-${to}-${y}${m}${dd}_a1c0i0y0&view=upsell&bookingFlow=revenue&sortBy=rec&filterBy=all`;
+  if (code === "WF") return `https://www.wideroe.no/bestill-flybillett/flygning?d_city=${from.toLowerCase()}&a_city=${to.toLowerCase()}&pax=adt&triptype=1&d_day=${dd}&d_month=${y}${m}`;
+  if (code === "FR" || code === "RK") return `https://www.ryanair.com/no/no/trip/flights/select?adults=1&teens=0&children=0&infants=0&dateOut=${d}&isConnectedFlight=false&isReturn=false&discount=0&originIata=${from}&destinationIata=${to}`;
+  return null;
+}
+const dateNo = iso => new Date(iso).toLocaleDateString("nb-NO", {weekday:"short", day:"2-digit", month:"2-digit", year:"2-digit"});
+const FOUND_FLIGHT = {}; // fylles av Avinor-oppslaget: "IATA|planlagt tid" -> fly
+function purchasePlan(legs, sig){
+  const ps = purchases(legs);
+  if (!ps.length) return "";
+  const done = store.get("kjopt", {});
+  const items = ps.map((p, i) => {
+    const a = p.legs[0], b = p.legs[p.legs.length-1];
+    const fromName = shortName(i === 0 ? legs[0].fromPlace.name : a.fromPlace.name);
+    const toName = shortName(i === ps.length-1 ? legs[legs.length-1].toPlace.name : b.toPlace.name);
+    const modes = [...new Set(p.legs.map(l => (SUBMODE_NAME[l.transportSubmode] || MODE_NAME[l.mode]).toLowerCase()))].join(" og ");
+    const when = `${dateNo(a.expectedStartTime)} kl. ${hm(a.expectedStartTime)}–${hm(b.expectedEndTime)}`;
+    let title, sub, open, openLabel, copy;
+    if (p.kind === "entur"){
+      const fromP = i === 0 ? legs[0].fromPlace : a.fromPlace;
+      const toP = i === ps.length-1 ? legs[legs.length-1].toPlace : b.toPlace;
+      const cos = [...new Set(p.legs.map(l => sellerOf(l)?.name).filter(Boolean))].join(", ");
+      title = `Entur: ${modes} ${fromName} → ${toName}`;
+      sub = `${when}${cos ? " · " + cos : ""}`;
+      open = enturUrl(fromP, toP, a.expectedStartTime); openLabel = "Åpne i Entur";
+      copy = `${fromName} → ${toName}, ${when} (${modes})`;
+    } else if (p.kind === "air"){
+      const fi = iataFor(a.fromPlace.name), ti = iataFor(a.toPlace.name);
+      const name = p.seller?.name || "Flyselskap";
+      const code = AIRLINE_CODE[p.seller?.raw] || "";
+      const slot = `${fi}|${a.aimedStartTime}`;
+      title = `${name}: fly ${shortName(a.fromPlace.name)}${fi ? " (" + fi + ")" : ""} → ${shortName(a.toPlace.name)}${ti ? " (" + ti + ")" : ""}`;
+      sub = `${when} · <span data-flightslot="${esc(slot)}">flightnummer hentes …</span>`;
+      open = airlineSearchUrl(code, fi, ti, a.aimedStartTime) || p.seller?.url;
+      openLabel = airlineSearchUrl(code, fi, ti, a.aimedStartTime) ? `Søk hos ${name}` : `Til ${name}`;
+      copy = {slot, text:`${shortName(a.fromPlace.name)}${fi ? " (" + fi + ")" : ""} → ${shortName(a.toPlace.name)}${ti ? " (" + ti + ")" : ""}, ${dateNo(a.aimedStartTime)} kl. ${hm(a.aimedStartTime)}`};
+    } else {
+      const name = p.seller?.name || "selskapet";
+      title = `${name}: ${modes} ${fromName} → ${toName}`;
+      sub = `${when} · selges ikke i Entur`;
+      open = p.seller?.url; openLabel = `Til ${name}`;
+      copy = `${fromName} → ${toName}, ${when}`;
+    }
+    // kort bytte mellom separate billetter
+    let warn = "";
+    if (i > 0){
+      const prev = ps[i-1].legs[ps[i-1].legs.length-1];
+      const gap = Math.round((new Date(a.expectedStartTime) - new Date(prev.expectedEndTime)) / 60000);
+      const need = prev.mode === "air" ? 45 : a.mode === "air" ? 60 : 10;
+      if (gap < need){
+        const why = prev.mode === "air" ? "fra landing til neste avgang" : a.mode === "air" ? "fra ankomst til avgang, med innsjekk og sikkerhetskontroll" : "til neste avgang";
+        warn = `<div class="warn">⚠ Bare ${gap} min ${why}, og billettene kjøpes hver for seg. Blir du forsinket, gjelder ikke den neste billetten automatisk på en senere avgang.</div>`;
+      }
+    }
+    const id = `${sig}|${i}`;
+    const copyAttr = typeof copy === "string" ? `data-copy="${esc(copy)}"` : `data-copy="${esc(copy.text)}" data-copyslot="${esc(copy.slot)}"`;
+    return `${warn ? `<li>${warn}</li>` : ""}<li class="buy${done[id] ? " done" : ""}">
+      <input type="checkbox" data-kjopt="${esc(id)}" ${done[id] ? "checked" : ""} aria-label="Kjøpt: ${esc(title)}">
+      <div><div class="buy-title">${esc(title)}</div><div class="buy-sub">${sub}</div></div>
+      <div class="buy-actions">${open ? `<a class="main" href="${esc(open)}" target="_blank" rel="noopener">${esc(openLabel)} ↗</a>` : ""}<button type="button" ${copyAttr}>Kopier reisedata</button></div>
+    </li>`;
   }).join("");
-  return `<div class="tickets"><span class="lbl">Billett</span>${entur}${links}</div>
-    <p class="small" style="margin:6px 0 0">Entur-lenken åpner søket med samme fra, til og avgangstid${hasAir ? " for delene uten fly" : ""}. Entur selger ikke billett til alt. Ved hver etappe står det hvem som selger billetten, og står det «Billett ikke tilgjengelig» hos Entur, kjøper du den delen der.</p>`;
+  const n = ps.length;
+  return `<div class="plan"><h3>Kjøpsliste <span>${n === 1 ? "Ett kjøp" : n + " kjøp"} · kryss av etter hvert</span></h3><ol>${items}</ol>
+    <div class="tripbar"><button type="button" data-ics>Legg i kalenderen</button></div>
+    <p class="small" style="margin:8px 0 0">Entur-lenkene åpner søket med samme fra, til og tid. Står det «Billett ikke tilgjengelig» hos Entur, kjøper du den delen hos selskapet ved etappen over.</p></div>`;
+}
+
+/* Kalenderfil for hele reisen */
+function icsFor(p){
+  const z = iso => new Date(iso).toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "");
+  const escI = t => String(t).replace(/\\/g, "\\\\").replace(/;/g, "\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
+  const legs = p.legs, first = legs[0], last = legs[legs.length-1];
+  const lines = legs.filter(l => l.mode !== "foot").map(l => {
+    const q = l.fromPlace.quay?.publicCode;
+    const fl = l.mode === "air" ? FOUND_FLIGHT[`${iataFor(l.fromPlace.name)}|${l.aimedStartTime}`] : null;
+    return `${hm(l.expectedStartTime)} ${l.fromPlace.name}${q ? (l.mode === "rail" ? " spor " : " plf. ") + q : ""}: ${(SUBMODE_NAME[l.transportSubmode] || MODE_NAME[l.mode])} ${l.line?.publicCode || ""}${fl ? fl.flight_id : ""} mot ${l.toPlace.name}, framme ${hm(l.expectedEndTime)}`;
+  });
+  const title = `Reise ${shortName(first.fromPlace.name)} → ${shortName(last.toPlace.name)}`;
+  return ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//reisesok//NO","BEGIN:VEVENT",
+    `UID:${z(first.expectedStartTime)}-${Math.random().toString(36).slice(2)}@reisesok`,
+    `DTSTAMP:${z(new Date().toISOString())}`, `DTSTART:${z(first.expectedStartTime)}`, `DTEND:${z(last.expectedEndTime)}`,
+    `SUMMARY:${escI(title)}`, `LOCATION:${escI(first.fromPlace.name)}`,
+    `DESCRIPTION:${escI(lines.join("\n") + "\n\nSjekk sanntid: https://sabajan-ki.github.io/reisesok/")}`,
+    "END:VEVENT","END:VCALENDAR"].join("\r\n");
+}
+function toast(msg){
+  const t = document.createElement("div"); t.className = "toast"; t.textContent = msg; t.setAttribute("role", "status");
+  document.body.appendChild(t); setTimeout(() => t.remove(), 2200);
+}
+async function copyText(text){
+  try { await navigator.clipboard.writeText(text); toast("Kopiert"); }
+  catch { window.prompt ? window.prompt("Kopier teksten:", text) : toast(text); }
 }
 const shortName = n => String(n || "").split(",")[0];
 function enturUrl(from, to, startIso){
@@ -645,7 +819,10 @@ async function enrichFlights(legsEl){
       const aimed = new Date(leg.dataset.aimed).getTime();
       const cand = fl.filter(f => (!to || f.airport === to) && Math.abs(new Date(f.schedule_time).getTime() - aimed) <= 15*60000);
       const f = cand.sort((a,b) => Math.abs(new Date(a.schedule_time)-aimed) - Math.abs(new Date(b.schedule_time)-aimed))[0];
-      if (!f) { box.textContent = "Avinor har ikke denne avgangen ennå (de viser rundt ett døgn fram). Sjekk nærmere avreise."; continue; }
+      if (!f) { box.textContent = "Avinor har ikke denne avgangen ennå (de viser rundt ett døgn fram). Sjekk nærmere avreise.";
+        document.querySelectorAll(`[data-flightslot="${from}|${leg.dataset.aimed}"]`).forEach(el => el.textContent = "flightnummer kommer rundt ett døgn før avreise"); continue; }
+      FOUND_FLIGHT[`${from}|${leg.dataset.aimed}`] = f;
+      document.querySelectorAll(`[data-flightslot="${from}|${leg.dataset.aimed}"]`).forEach(el => el.textContent = `${f.flight_id}${f.gate ? ", gate " + f.gate : ""}`);
       const st = flightStatus(f);
       box.innerHTML = `<b>${esc(f.flight_id)}</b> · ${esc(AIRLINES[f.airline] || f.airline)} · planlagt ${hm(f.schedule_time)}${f.gate ? ` · gate <b>${esc(f.gate)}</b>` : ""}${st ? ` · <span class="st ${st[1]}">${st[0]}${f.status.time ? " " + hm(f.status.time) : ""}</span>` : ""}`;
     } catch (err) { box.textContent = "Fikk ikke kontakt med Avinor akkurat nå."; }
@@ -782,7 +959,7 @@ function renderFlights(){
 }
 
 /* start */
-showTab(store.get("tab", "reise"));
+if (!loadFromUrl()) showTab(store.get("tab", "reise"));
 </script>
 </body>
 </html>
