@@ -105,6 +105,10 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
 .badge{font:600 .85rem var(--f-mono);border-radius:4px;padding:2px 7px;color:#fff;background:var(--c,var(--m-other))}
 .leg .detail{font-size:.85rem;color:var(--muted);margin-top:3px}
 .leg .alert{font-size:.85rem;background:var(--late-bg);color:var(--late);border-radius:6px;padding:6px 8px;margin-top:6px}
+.tag.best{background:var(--accent);color:var(--accent-ink)}
+details.more{margin-top:4px}
+details.more>summary{cursor:pointer;color:var(--accent);font-size:.9rem;padding:10px 2px;list-style-position:inside}
+details.more .results{margin-top:6px}
 .plan{border-top:1px solid var(--line);margin-top:10px;padding-top:10px}
 .plan h3{font:700 1.05rem var(--f-disp);letter-spacing:.04em;text-transform:uppercase;margin:0 0 8px;display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap}
 .plan h3 span{font:400 .85rem var(--f-body);letter-spacing:0;text-transform:none;color:var(--muted)}
@@ -206,6 +210,13 @@ footer{margin-top:28px;font-size:.78rem;color:var(--muted);border-top:1px solid 
       <div>
         <label class="lbl" for="when">Tidspunkt</label>
         <input type="datetime-local" id="when">
+      </div>
+    </div>
+    <div>
+      <label class="lbl">Prioriter</label>
+      <div class="seg" role="group" aria-label="Prioriter">
+        <button type="button" id="prefFast" aria-pressed="true">Raskest</button>
+        <button type="button" id="prefFew" aria-pressed="false">Færrest bytter</button>
       </div>
     </div>
     <div>
@@ -436,8 +447,8 @@ $("#useGeo").onclick = () => {
   }, () => { $("#useGeo").textContent = "Fikk ikke posisjon. Skriv stedet i stedet."; }, {enableHighAccuracy:true, timeout:10000});
 };
 
-const TRIP_Q = `query($from:Location!,$to:Location!,$dt:DateTime,$arriveBy:Boolean,$modes:Modes,$cursor:String){
- trip(from:$from,to:$to,dateTime:$dt,arriveBy:$arriveBy,modes:$modes,numTripPatterns:6,pageCursor:$cursor){
+const TRIP_Q = `query($from:Location!,$to:Location!,$dt:DateTime,$arriveBy:Boolean,$modes:Modes,$cursor:String,$tp:Int){
+ trip(from:$from,to:$to,dateTime:$dt,arriveBy:$arriveBy,modes:$modes,numTripPatterns:10,pageCursor:$cursor,transferPenalty:$tp){
   previousPageCursor nextPageCursor
   tripPatterns{ expectedStartTime expectedEndTime aimedStartTime aimedEndTime duration walkDistance
    legs{ mode transportSubmode distance duration realtime aimedStartTime expectedStartTime aimedEndTime expectedEndTime
@@ -449,6 +460,15 @@ const TRIP_Q = `query($from:Location!,$to:Location!,$dt:DateTime,$arriveBy:Boole
     intermediateEstimatedCalls{quay{name} expectedDepartureTime}
  }}}}`;
 
+let prefFew = store.get("prefFew", false);
+function setPref(few){
+  prefFew = few; store.set("prefFew", few);
+  $("#prefFast").setAttribute("aria-pressed", String(!few)); $("#prefFew").setAttribute("aria-pressed", String(few));
+}
+setPref(prefFew);
+$("#prefFast").onclick = () => { setPref(false); if (currentTrips.length) renderTrips(); };
+$("#prefFew").onclick = () => { setPref(true); if (currentTrips.length) renderTrips(); };
+
 $("#tripForm").addEventListener("submit", async e => {
   e.preventDefault();
   const out = $("#tripOut"); out.innerHTML = `<div class="status">Leter etter ruter …</div>`;
@@ -457,7 +477,7 @@ $("#tripForm").addEventListener("submit", async e => {
     if (!f || !t) { out.innerHTML = `<div class="err">Fant ikke ${!f ? "fra-stedet" : "til-stedet"}. Prøv et annet navn eller velg fra lista.</div>`; return; }
     const when = $("#when").value ? new Date($("#when").value) : new Date();
     const api = getTripModes();
-    lastQuery = { from:toLoc(f), to:toLoc(t), dt:localIso(when), arriveBy, modes: api ? {transportModes: api.map(m => ({transportMode:m})), accessMode:"foot", egressMode:"foot"} : null };
+    lastQuery = { from:toLoc(f), to:toLoc(t), dt:localIso(when), arriveBy, tp: prefFew ? 3600 : null, modes: api ? {transportModes: api.map(m => ({transportMode:m})), accessMode:"foot", egressMode:"foot"} : null };
     saveRecent(f, t);
     await runTrip(null);
   } catch (err) { out.innerHTML = `<div class="err">Søket feilet: ${esc(err.message)}. Sjekk nettforbindelsen og prøv igjen.</div>`; }
@@ -476,12 +496,47 @@ async function runTrip(cursor, back = false){
   }
   const tp = d.trip.tripPatterns.slice().sort((a,b) => new Date(a.expectedStartTime) - new Date(b.expectedStartTime));
   if (!tp.length) { out.innerHTML = `<div class="status">Ingen reiser funnet det neste døgnet med disse valgene. Prøv et annet tidspunkt eller slå på flere transportmidler.</div>`; return; }
-  currentTrips = tp;
-  out.innerHTML = `<div class="sharebar"><button type="button" id="shareBtn">Del søket</button></div><div class="results">${tp.map((p,i) => tripCard(p,i)).join("")}</div>
-    <div class="pager"><button type="button" id="prevP" ${d.trip.previousPageCursor ? "" : "disabled"}>← Tidligere</button><button type="button" id="nextP" ${d.trip.nextPageCursor ? "" : "disabled"}>Senere →</button></div>`;
+  currentTrips = tp; currentPage = d.trip;
+  renderTrips();
+}
+let currentPage = null;
+const nTransfers = p => Math.max(0, p.legs.filter(l => l.mode !== "foot").length - 1);
+/* En reise skjules når en annen går omtrent like sent (inntil 10 min tidligere), er framme like tidlig
+   eller tidligere og har like få eller færre bytter. Da står bare reelle valg igjen. */
+function paretoSplit(tp){
+  const t = p => [new Date(p.expectedStartTime).getTime(), new Date(p.expectedEndTime).getTime(), nTransfers(p)];
+  const keep = [], hide = [];
+  tp.forEach((p, i) => {
+    const [d, a, n] = t(p);
+    const beaten = tp.some((q, j) => {
+      if (j === i) return false;
+      const [d2, a2, n2] = t(q);
+      const SLACK = 10 * 60000; // avreise inntil 10 min tidligere regnes som like bra
+      const asGood = d2 >= d - SLACK && a2 <= a && n2 <= n;
+      const better = d2 > d || a2 < a || n2 < n;
+      const identical = d2 === d && a2 === a && n2 === n;
+      return asGood && (better || (identical && j < i));
+    });
+    (beaten ? hide : keep).push(i);
+  });
+  return {keep, hide};
+}
+function renderTrips(){
+  const out = $("#tripOut"), tp = currentTrips, pg = currentPage;
+  const {keep, hide} = paretoSplit(tp);
+  const fastest = keep.reduce((b, i) => tp[i].duration < tp[b].duration ? i : b, keep[0]);
+  const fewest = keep.reduce((b, i) => nTransfers(tp[i]) < nTransfers(tp[b]) || (nTransfers(tp[i]) === nTransfers(tp[b]) && tp[i].duration < tp[b].duration) ? i : b, keep[0]);
+  const order = keep.slice().sort((x, y) => prefFew
+    ? nTransfers(tp[x]) - nTransfers(tp[y]) || new Date(tp[x].expectedEndTime) - new Date(tp[y].expectedEndTime)
+    : new Date(tp[x].expectedStartTime) - new Date(tp[y].expectedStartTime));
+  const badges = i => [i === fastest && keep.length > 1 ? "Raskest" : null, i === fewest && keep.length > 1 && nTransfers(tp[fewest]) < nTransfers(tp[fastest]) ? "Færrest bytter" : null].filter(Boolean);
+  out.innerHTML = `<div class="sharebar"><button type="button" id="shareBtn">Del søket</button></div>
+    <div class="results">${order.map(i => tripCard(tp[i], i, badges(i))).join("")}</div>
+    ${hide.length ? `<details class="more"><summary>Vis ${hide.length} lignende ${hide.length === 1 ? "reise" : "reiser"} med flere bytter eller dårligere tider</summary><div class="results">${hide.map(i => tripCard(tp[i], i, [])).join("")}</div></details>` : ""}
+    <div class="pager"><button type="button" id="prevP" ${pg.previousPageCursor ? "" : "disabled"}>← Tidligere</button><button type="button" id="nextP" ${pg.nextPageCursor ? "" : "disabled"}>Senere →</button></div>`;
   $("#shareBtn").onclick = shareSearch;
-  $("#prevP").onclick = () => runTrip(d.trip.previousPageCursor, true).catch(showTripErr);
-  $("#nextP").onclick = () => runTrip(d.trip.nextPageCursor).catch(showTripErr);
+  $("#prevP").onclick = () => runTrip(pg.previousPageCursor, true).catch(showTripErr);
+  $("#nextP").onclick = () => runTrip(pg.nextPageCursor).catch(showTripErr);
   out.querySelectorAll(".trip>button.head").forEach(b => b.addEventListener("click", () => {
     const legs = b.nextElementSibling; legs.hidden = !legs.hidden; b.setAttribute("aria-expanded", !legs.hidden);
     if (!legs.hidden) enrichFlights(legs, tp[+b.dataset.i]);
@@ -553,7 +608,7 @@ function showTripErr(err){ $("#tripOut").insertAdjacentHTML("beforeend", `<div c
 
 const tripSig = p => { const t = p.legs.filter(l => l.mode !== "foot"); return t.map(l => (l.line?.publicCode || l.mode) + "@" + l.aimedStartTime).join(">"); };
 function hasShortSeparateTransfer(p){ return /class="warn"/.test(purchasePlan(p.legs, "x")); }
-function tripCard(p, i){
+function tripCard(p, i, badges = []){
   const legs = p.legs, transit = legs.filter(l => l.mode !== "foot");
   const changes = Math.max(0, transit.length - 1);
   const total = legs.reduce((s,l) => s + l.duration, 0) || 1;
@@ -565,7 +620,7 @@ function tripCard(p, i){
     const code = l.line?.publicCode || (l.mode === "air" ? "✈" : MODE_NAME[l.mode] || "");
     return `<span class="seg-leg" style="flex:${pct};background:${c};color:${tc}" title="${esc(MODE_NAME[l.mode]||l.mode)} ${esc(code)}">${esc(code)}</span>`;
   }).join("");
-  const tags = [];
+  const tags = badges.map(b => `<span class="tag best">${esc(b)}</span>`);
   const dl = delayMin(p.aimedStartTime, p.expectedStartTime);
   if (dl >= 2) tags.push(`<span class="tag late">${dl} min forsinket</span>`);
   if (legs.some(l => l.fromEstimatedCall?.cancellation)) tags.push(`<span class="tag bad">Innstilt del</span>`);
