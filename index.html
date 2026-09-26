@@ -526,9 +526,10 @@ function renderTrips(){
   const {keep, hide} = paretoSplit(tp);
   const fastest = keep.reduce((b, i) => tp[i].duration < tp[b].duration ? i : b, keep[0]);
   const fewest = keep.reduce((b, i) => nTransfers(tp[i]) < nTransfers(tp[b]) || (nTransfers(tp[i]) === nTransfers(tp[b]) && tp[i].duration < tp[b].duration) ? i : b, keep[0]);
+  // valget styrer rekkefølgen: raskest øverst, eller færrest bytter øverst (likt: kortest reisetid)
   const order = keep.slice().sort((x, y) => prefFew
-    ? nTransfers(tp[x]) - nTransfers(tp[y]) || new Date(tp[x].expectedEndTime) - new Date(tp[y].expectedEndTime)
-    : new Date(tp[x].expectedStartTime) - new Date(tp[y].expectedStartTime));
+    ? nTransfers(tp[x]) - nTransfers(tp[y]) || tp[x].duration - tp[y].duration
+    : tp[x].duration - tp[y].duration || nTransfers(tp[x]) - nTransfers(tp[y]));
   const badges = i => [i === fastest && keep.length > 1 ? "Raskest" : null, i === fewest && keep.length > 1 && nTransfers(tp[fewest]) < nTransfers(tp[fastest]) ? "Færrest bytter" : null].filter(Boolean);
   out.innerHTML = `<div class="sharebar"><button type="button" id="shareBtn">Del søket</button></div>
     <div class="results">${order.map(i => tripCard(tp[i], i, badges(i))).join("")}</div>
