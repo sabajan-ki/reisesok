@@ -527,6 +527,7 @@ function legsHtml(legs){
         <span class="stop">${esc(l.fromPlace.name)}</span>${quay ? ` <span class="small">${l.mode === "rail" ? "spor" : "plf."} ${esc(quay)}</span>` : ""}
         <div class="line">${code ? `<span class="badge">${esc(code)}</span>` : ""}<span>${esc(kind)} ${front ? "mot " + esc(front) : ""}</span></div>
         <div class="detail">${esc(op)} · ${dur(l.duration)}${l.realtime ? " · sanntid" : ""}${dl >= 2 ? ` · <b style="color:var(--late)">${dl} min forsinket</b>` : ""}</div>
+        ${sellerLine(l)}
         ${inter.length ? `<details class="stops"><summary>${inter.length} stopp underveis</summary><ol>${inter.map(c => `<li>${hm(c.expectedDepartureTime)} ${esc(c.quay?.name)}</li>`).join("")}</ol></details>` : ""}
         ${cancel}${sits}
         ${l.mode === "air" ? `<div class="flight" data-flight>Henter flightnummer og gate fra Avinor …</div>` : ""}
@@ -541,29 +542,42 @@ function legsHtml(legs){
   return h;
 }
 
+function sellerLine(l){
+  const sl = sellerOf(l); if (!sl) return "";
+  const name = sl.url ? `<a href="${esc(sl.url)}" target="_blank" rel="noopener" style="color:var(--accent)">${esc(sl.name)}</a>` : esc(sl.name);
+  const where = l.mode === "air" ? "kjøpes hos flyselskapet" : sl.entur ? "i Entur eller hos" : "selges ikke i Entur, kjøp hos";
+  return `<div class="detail">Billett: ${l.mode === "air" ? name + ", " + where : where + " " + name}</div>`;
+}
 /* Billettlenker: selskapet som selger billetten (Enturs «authority»), for fly flyselskapet */
+/* Selskap Entur ikke selger billett for (bekreftet på entur.no). Utvid lista når noe nytt dukker opp. */
+const NOT_IN_ENTUR = ["Vy Buss"];
+function sellerOf(l){
+  const s = l.mode === "air" ? (l.operator || l.authority) : (l.authority?.url ? l.authority : l.operator);
+  if (!s?.name) return null;
+  return {name: SELLER_NAME[s.name] || s.name, raw: s.name, url: s.url ? s.url.replace(/^http:/, "https:") : null, entur: l.mode !== "air" && !NOT_IN_ENTUR.includes(s.name)};
+}
 const SELLER_NAME = {"Nordland fylkeskommune":"Reis Nordland","Agder Kollektivtrafikk AS":"AKT","Tide AS":"Flybussen","Norled AS":"Norled","Fjord1 ASA":"Fjord1","Boreal Norge":"Boreal","Go-Ahead Norge AS":"Go-Ahead","ATB":"AtB"};
 function ticketLinks(legs){
   const seen = new Map();
   legs.filter(l => l.mode !== "foot").forEach(l => {
-    const seller = l.mode === "air" ? (l.operator || l.authority) : (l.authority?.url ? l.authority : l.operator);
-    if (!seller?.name || !seller.url || seen.has(seller.url)) return;
-    seen.set(seller.url, SELLER_NAME[seller.name] || seller.name);
+    const sl = sellerOf(l);
+    if (!sl?.url || seen.has(sl.url)) return;
+    seen.set(sl.url, sl.name);
   });
-  const links = [...seen].map(([url, name]) => `<a href="${esc(url.replace(/^http:/, "https:"))}" target="_blank" rel="noopener">${esc(name)} ↗</a>`).join("");
+  const links = [...seen].map(([url, name]) => `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(name)} ↗</a>`).join("");
   // Entur viser ikke fly, så en reise med fly deles i bakkedeler med hver sin Entur-lenke
   const parts = []; let cur = [];
   legs.forEach(l => { if (l.mode === "air") { parts.push(cur); cur = []; } else cur.push(l); });
   parts.push(cur);
-  const ground = parts.filter(p => p.some(l => l.mode !== "foot"));
+  const ground = parts.filter(p => p.some(l => l.mode !== "foot" && sellerOf(l)?.entur !== false));
   const hasAir = legs.some(l => l.mode === "air");
   const entur = ground.map(p => {
     const a = p[0], b = p[p.length-1];
-    const label = hasAir ? `Entur: ${shortName(a.fromPlace.name)} → ${shortName(b.toPlace.name)}` : "Kjøp i Entur";
+    const label = hasAir || ground.length > 1 ? `Entur: ${shortName(a.fromPlace.name)} → ${shortName(b.toPlace.name)}` : "Søk i Entur";
     return `<a class="main" href="${esc(enturUrl(a.fromPlace, b.toPlace, a.expectedStartTime))}" target="_blank" rel="noopener">${esc(label)} ↗</a>`;
   }).join("");
   return `<div class="tickets"><span class="lbl">Billett</span>${entur}${links}</div>
-    <p class="small" style="margin:6px 0 0">Entur-lenken åpner søket med samme fra, til og avgangstid${hasAir ? " for delene uten fly. Flybilletten kjøpes hos flyselskapet" : ""}. Selskapslenkene går til forsiden deres.</p>`;
+    <p class="small" style="margin:6px 0 0">Entur-lenken åpner søket med samme fra, til og avgangstid${hasAir ? " for delene uten fly" : ""}. Entur selger ikke billett til alt. Ved hver etappe står det hvem som selger billetten, og står det «Billett ikke tilgjengelig» hos Entur, kjøper du den delen der.</p>`;
 }
 const shortName = n => String(n || "").split(",")[0];
 function enturUrl(from, to, startIso){
