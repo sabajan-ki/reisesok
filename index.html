@@ -72,6 +72,9 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
 .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
 /* recent */
 .recent{display:flex;flex-wrap:wrap;gap:6px}
+#near{display:grid;gap:6px}
+#near button{text-align:left;display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:8px 12px}
+#near button small{margin-left:0}
 .recent button small{color:var(--muted);font-size:.78rem;margin-left:4px}
 .recent button[aria-pressed="true"]{border-style:solid;border-color:var(--accent);color:var(--accent)}
 .recent button{border:1px dashed var(--line);background:none;color:var(--ink);border-radius:8px;padding:6px 10px;font:inherit;font-size:.85rem;cursor:pointer}
@@ -245,6 +248,7 @@ footer{margin-top:28px;font-size:.78rem;color:var(--muted);border-top:1px solid 
     <div id="nearWrap" hidden>
       <label class="lbl">Nærmest deg</label>
       <div class="recent" id="near"></div>
+      <p class="small" id="nearNote" style="margin:6px 0 0"></p>
     </div>
     <div>
       <label class="lbl">Vis</label>
@@ -984,30 +988,47 @@ attachAC($("#stop"), {stopsOnly:true, onPick: p => { currentStop = p; loadDeps()
 $("#depChips").addEventListener("change", () => currentStop && loadDeps());
 $("#depForm").addEventListener("submit", async e => { e.preventDefault(); const r = await geocode($("#stop").value, true); if (r[0]) { $("#stop").value = r[0].name; currentStop = r[0]; loadDeps(); } });
 
-/* Nærmeste stopp: de nærmeste holdeplassene uansett type, pluss nærmeste stopp for tog,
-   trikk/T-bane og båt selv om de ligger lenger unna */
-const NEAR_Q = `query($lat:Float!,$lon:Float!,$max:Float!,$n:Int!,$modes:[TransportMode]){nearest(latitude:$lat,longitude:$lon,maximumDistance:$max,maximumResults:$n,filterByPlaceTypes:[stopPlace],filterByModes:$modes,multiModalMode:parent){edges{node{distance place{... on StopPlace{id name transportMode}}}}}}`;
+/* Nærmeste stopp med avgang du rekker: holdeplasser i gangavstand rangeres etter neste avgang du kan
+   nå fram til (gange ca. 80 m/min), ikke bare etter avstand. Stopp uten avganger snart vises til slutt. */
+const NEAR_Q = `query($lat:Float!,$lon:Float!,$max:Float!,$n:Int!,$modes:[TransportMode]){nearest(latitude:$lat,longitude:$lon,maximumDistance:$max,maximumResults:$n,filterByPlaceTypes:[stopPlace],filterByModes:$modes,multiModalMode:parent){edges{node{distance place{... on StopPlace{id name transportMode estimatedCalls(numberOfDepartures:4,timeRange:259200){expectedDepartureTime destinationDisplay{frontText} serviceJourney{line{publicCode}}}}}}}}}`;
 const MODE_WORD = {bus:"buss",coach:"buss",rail:"tog",tram:"trikk",metro:"T-bane",water:"båt",air:"fly"};
 const fmtDist = m => m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1).replace(".", ",")} km`;
+const SOON = 3 * 3600e3; // «snart» = innen tre timer
 async function nearestStops(lat, lon){
   const ask = (max, n, modes) => gql(NEAR_Q, {lat, lon, max, n, modes}).then(d => d.nearest.edges.map(e => ({...e.node.place, distance:e.node.distance}))).catch(() => []);
-  const lists = await Promise.all([ask(1500, 4, null), ask(30000, 1, ["rail"]), ask(10000, 1, ["tram", "metro"]), ask(30000, 1, ["water"])]);
-  const seen = new Map();
-  lists.flat().forEach(p => { if (p?.id && !seen.has(p.id)) seen.set(p.id, p); });
-  return [...seen.values()].sort((a, b) => a.distance - b.distance).slice(0, 7);
+  let lists = await Promise.all([ask(1500, 15, null), ask(30000, 1, ["rail"]), ask(10000, 1, ["tram", "metro"]), ask(30000, 1, ["water"])]);
+  const now = Date.now();
+  const enrich = p => {
+    const walk = Math.max(1, Math.ceil(p.distance / 80));
+    const next = (p.estimatedCalls || []).find(c => new Date(c.expectedDepartureTime).getTime() >= now + (walk - 1) * 60000);
+    return {...p, walk, next, soon: !!next && new Date(next.expectedDepartureTime).getTime() - now < SOON};
+  };
+  let all = lists.flat().filter(p => p?.id).map(enrich);
+  // ingen avganger snart i gangavstand: let videre ut
+  if (!all.some(p => p.soon && p.distance <= 1500)) all = all.concat((await ask(4000, 15, null)).map(enrich));
+  const seen = new Map(); all.forEach(p => { if (!seen.has(p.id)) seen.set(p.id, p); });
+  const list = [...seen.values()];
+  const active = list.filter(p => p.soon).sort((a, b) => new Date(a.next.expectedDepartureTime) - new Date(b.next.expectedDepartureTime) || a.distance - b.distance).slice(0, 6);
+  const quiet = list.filter(p => !p.soon).sort((a, b) => a.distance - b.distance).slice(0, 2);
+  return {active, quiet};
 }
-function showNearest(list){
+function showNearest({active, quiet}){
+  const list = active.concat(quiet);
   $("#nearWrap").hidden = !list.length; $("#near").innerHTML = "";
   if (!list.length){ $("#depOut").innerHTML = `<div class="status">Fant ingen stopp i nærheten.</div>`; return; }
-  list.forEach((p, i) => {
+  list.forEach(p => {
     const b = document.createElement("button"); b.type = "button";
     const kinds = [...new Set((p.transportMode || []).map(m => MODE_WORD[m]).filter(Boolean))].join("/");
-    b.innerHTML = `${esc(p.name)}<small>${esc(kinds)} · ${fmtDist(p.distance)}</small>`;
+    const nxt = p.next ? `${p.soon ? "neste" : "først"} ${dateLabel(p.next.expectedDepartureTime) === "i dag" ? "" : dateLabel(p.next.expectedDepartureTime) + " "}${hm(p.next.expectedDepartureTime)}${p.next.serviceJourney?.line?.publicCode ? " " + p.next.serviceJourney.line.publicCode : ""}` : "ingen avganger de neste tre døgnene";
+    b.innerHTML = `${esc(p.name)}<small>${esc(kinds)} · ${fmtDist(p.distance)}, ${p.walk} min å gå · ${esc(nxt)}</small>`;
     b.onclick = () => { $("#near").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", "false")); b.setAttribute("aria-pressed", "true");
       $("#stop").value = p.name; currentStop = {id:p.id, name:p.name, locality:"", cats:[]}; loadDeps(); };
     $("#near").appendChild(b);
-    if (i === 0) b.click();
   });
+  $("#nearNote").textContent = active.length
+    ? "Sortert etter neste avgang du rekker å gå til."
+    : "Ingen avganger de neste tre timene i nærheten. Reise-fanen finner en vei med gange til et stopp lenger unna.";
+  $("#near").querySelector("button").click();
 }
 $("#nearGeo").onclick = () => {
   const btn = $("#nearGeo");
