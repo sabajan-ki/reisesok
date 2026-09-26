@@ -1,0 +1,707 @@
+<!doctype html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Reisesøk Norge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+:root{
+  --bg:#EEF2F1; --panel:#FFFFFF; --ink:#13232C; --muted:#5A6B72; --line:#D5DEDC;
+  --accent:#0B6B6B; --accent-ink:#FFFFFF; --soft:#E1ECEA;
+  --late:#B45309; --late-bg:#FEF3C7; --bad:#B42318; --bad-bg:#FDE7E4; --ok:#1F7A3A;
+  --m-bus:#C0392B; --m-coach:#8E5A2B; --m-rail:#2B5CA8; --m-tram:#6B46B0; --m-metro:#D9731A;
+  --m-water:#0E8686; --m-air:#46507F; --m-foot:#8A989D; --m-other:#56666C;
+  --f-body:"Atkinson Hyperlegible",system-ui,-apple-system,sans-serif;
+  --f-disp:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0F1A1F; --panel:#172429; --ink:#E6EEEC; --muted:#93A5AB; --line:#2A3A40;
+  --accent:#3FB5AE; --accent-ink:#06201F; --soft:#1D3035;
+  --late:#F5B544; --late-bg:#3A2B0E; --bad:#F87171; --bad-bg:#3B1614; --ok:#5BC77E;
+  --m-foot:#6F8187; color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0F1A1F; --panel:#172429; --ink:#E6EEEC; --muted:#93A5AB; --line:#2A3A40;
+  --accent:#3FB5AE; --accent-ink:#06201F; --soft:#1D3035;
+  --late:#F5B544; --late-bg:#3A2B0E; --bad:#F87171; --bad-bg:#3B1614; --ok:#5BC77E;
+  --m-foot:#6F8187; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.45 var(--f-body);padding-inline:16px;padding-block:0 48px}
+.wrap{max-width:760px;margin:0 auto}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding-block:18px 10px;flex-wrap:wrap}
+h1{font:700 2rem/1 var(--f-disp);letter-spacing:.01em;margin:0;text-transform:uppercase}
+h1 span{color:var(--accent)}
+.sub{color:var(--muted);font-size:.85rem}
+nav.tabs{display:flex;gap:4px;background:var(--soft);padding:4px;border-radius:10px;position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
+nav.tabs button{flex:1;border:0;background:transparent;color:var(--ink);font:600 1.05rem var(--f-disp);letter-spacing:.04em;text-transform:uppercase;padding:9px 6px;border-radius:7px;cursor:pointer}
+nav.tabs button[aria-selected="true"]{background:var(--panel);color:var(--accent);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+section.pane{padding-top:14px}
+.form{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:12px}
+label.lbl{display:block;font:600 .78rem var(--f-body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.field{position:relative}
+input[type=text],input[type=search],input[type=datetime-local],select{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;min-height:44px}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.fromto{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
+.fromto .stack{display:grid;gap:8px}
+.iconbtn{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;min-width:44px;min-height:44px;cursor:pointer;font-size:1.2rem}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
+.row>*{flex:1 1 180px}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;flex:0 0 auto}
+.seg button{border:0;background:var(--bg);color:var(--ink);font:inherit;padding:10px 12px;cursor:pointer;min-height:44px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:6px 12px;font:inherit;font-size:.9rem;cursor:pointer;display:inline-flex;gap:6px;align-items:center;min-height:36px}
+.chip i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.chip[aria-pressed="false"]{opacity:.5;text-decoration:line-through}
+.go{background:var(--accent);color:var(--accent-ink);border:0;border-radius:8px;font:700 1.15rem var(--f-disp);letter-spacing:.05em;text-transform:uppercase;padding:12px;cursor:pointer;min-height:48px}
+.small{font-size:.85rem;color:var(--muted)}
+.linkbtn{background:none;border:0;color:var(--accent);font:inherit;font-size:.9rem;cursor:pointer;padding:4px 0;text-decoration:underline}
+/* autocomplete */
+.ac{position:absolute;left:0;right:0;top:100%;margin-top:4px;background:var(--panel);border:1px solid var(--line);border-radius:8px;z-index:20;box-shadow:0 8px 24px rgba(0,0,0,.15);max-height:320px;overflow:auto}
+.ac button{display:flex;width:100%;text-align:left;gap:10px;align-items:center;border:0;background:none;color:var(--ink);padding:9px 12px;font:inherit;cursor:pointer;border-bottom:1px solid var(--line)}
+.ac button:last-child{border-bottom:0}
+.ac button:hover,.ac button.hl{background:var(--soft)}
+.ac .where{color:var(--muted);font-size:.82rem}
+.ac .kinds{margin-left:auto;display:flex;gap:3px}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+/* recent */
+.recent{display:flex;flex-wrap:wrap;gap:6px}
+.recent button{border:1px dashed var(--line);background:none;color:var(--ink);border-radius:8px;padding:6px 10px;font:inherit;font-size:.85rem;cursor:pointer}
+/* results */
+.status{padding:14px 2px;color:var(--muted)}
+.err{background:var(--bad-bg);color:var(--bad);border-radius:8px;padding:10px 12px;margin-top:12px}
+.results{display:grid;gap:10px;margin-top:14px}
+.trip{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.trip>button.head{display:grid;grid-template-columns:auto 1fr auto;gap:4px 14px;width:100%;text-align:left;border:0;background:none;color:var(--ink);padding:12px 14px;cursor:pointer;font:inherit;align-items:center}
+.times{font:600 1.35rem/1.1 var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.times s{color:var(--muted);font-size:.8rem;font-weight:500;display:block}
+.meta{font-size:.85rem;color:var(--muted);text-align:right;white-space:nowrap}
+.meta b{color:var(--ink);font:600 1.05rem var(--f-mono)}
+.bar{grid-column:1/-1;display:flex;gap:3px;height:26px;align-items:stretch}
+.seg-leg{border-radius:4px;display:flex;align-items:center;justify-content:center;color:#fff;font:600 .8rem var(--f-mono);min-width:26px;overflow:hidden;white-space:nowrap;padding:0 4px}
+.seg-leg.foot{background:repeating-linear-gradient(90deg,var(--m-foot) 0 4px,transparent 4px 7px);min-width:10px;opacity:.7}
+.tags{grid-column:1/-1;display:flex;gap:6px;flex-wrap:wrap}
+.tag{font-size:.75rem;border-radius:4px;padding:2px 6px;background:var(--soft);color:var(--ink)}
+.tag.late{background:var(--late-bg);color:var(--late)}
+.tag.bad{background:var(--bad-bg);color:var(--bad)}
+.legs{border-top:1px solid var(--line);padding:6px 14px 12px}
+.leg{display:grid;grid-template-columns:52px 18px 1fr;gap:0 10px;position:relative}
+.leg .t{font:600 .95rem var(--f-mono);font-variant-numeric:tabular-nums;padding-top:8px;text-align:right}
+.leg .t s{display:block;color:var(--muted);font-size:.75rem;font-weight:500}
+.leg .rail{position:relative;display:flex;justify-content:center}
+.leg .rail::before{content:"";position:absolute;top:0;bottom:0;width:5px;border-radius:3px;background:var(--c,var(--m-other))}
+.leg.foot .rail::before{background:repeating-linear-gradient(180deg,var(--m-foot) 0 4px,transparent 4px 8px);width:3px}
+.leg .rail::after{content:"";position:absolute;top:11px;width:11px;height:11px;border-radius:50%;background:var(--panel);border:3px solid var(--c,var(--m-other))}
+.leg.foot .rail::after{border-color:var(--m-foot)}
+.leg .body{padding:6px 0 12px}
+.leg .stop{font-weight:700}
+.leg .line{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px}
+.badge{font:600 .85rem var(--f-mono);border-radius:4px;padding:2px 7px;color:#fff;background:var(--c,var(--m-other))}
+.leg .detail{font-size:.85rem;color:var(--muted);margin-top:3px}
+.leg .alert{font-size:.85rem;background:var(--late-bg);color:var(--late);border-radius:6px;padding:6px 8px;margin-top:6px}
+.leg .flight{font-size:.85rem;background:var(--soft);border-radius:6px;padding:6px 8px;margin-top:6px}
+details.stops{font-size:.85rem;color:var(--muted);margin-top:4px}
+details.stops summary{cursor:pointer}
+details.stops ol{margin:4px 0 0;padding-left:18px}
+.end{display:grid;grid-template-columns:52px 18px 1fr;gap:0 10px}
+.end .t{font:600 .95rem var(--f-mono);text-align:right}
+.end .stop{font-weight:700}
+.pager{display:flex;justify-content:space-between;gap:8px;margin-top:12px}
+.pager button{flex:1;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:10px;font:inherit;cursor:pointer;min-height:44px}
+/* board */
+.boardhead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-top:16px;flex-wrap:wrap}
+.boardhead h2{font:700 1.5rem var(--f-disp);text-transform:uppercase;margin:0;letter-spacing:.02em}
+.board{margin-top:8px;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.dep{display:grid;grid-template-columns:62px auto 1fr auto;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line)}
+.dep:last-child{border-bottom:0}
+.dep .t{font:600 1.1rem var(--f-mono);font-variant-numeric:tabular-nums}
+.dep .t s{display:block;font-size:.75rem;color:var(--muted);font-weight:500}
+.dep .dest{min-width:0}
+.dep .dest b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dep .dest span{font-size:.8rem;color:var(--muted)}
+.dep .right{text-align:right;font-size:.8rem;color:var(--muted);white-space:nowrap}
+.dep .right b{display:block;font:600 1rem var(--f-mono);color:var(--ink)}
+.dep.cancel .dest b,.dep.cancel .t{text-decoration:line-through;color:var(--bad)}
+.st{font-size:.75rem;border-radius:4px;padding:2px 6px;display:inline-block}
+.st.ok{color:var(--ok)} .st.late{background:var(--late-bg);color:var(--late)} .st.bad{background:var(--bad-bg);color:var(--bad)}
+.hint{margin-top:18px;font-size:.85rem;color:var(--muted);line-height:1.5}
+.hint a{color:var(--accent)}
+footer{margin-top:28px;font-size:.78rem;color:var(--muted);border-top:1px solid var(--line);padding-top:10px}
+@media (max-width:520px){
+  .dep{grid-template-columns:52px auto 1fr;}
+  .dep .right{grid-column:2/-1;text-align:left;display:flex;gap:10px}
+  .dep .right b{display:inline}
+  .times{font-size:1.15rem}
+}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Reise<span>søk</span></h1>
+  <div class="sub">Buss · tog · trikk · ferje · fly — hele Norge</div>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button role="tab" id="tab-reise" aria-selected="true" data-pane="reise">Reise</button>
+  <button role="tab" id="tab-avg" aria-selected="false" data-pane="avg">Avganger</button>
+  <button role="tab" id="tab-fly" aria-selected="false" data-pane="fly">Fly</button>
+</nav>
+
+<!-- REISE -->
+<section class="pane" id="pane-reise">
+  <form class="form" id="tripForm" autocomplete="off">
+    <div class="fromto">
+      <div class="stack">
+        <div class="field">
+          <label class="lbl" for="from">Fra</label>
+          <input type="search" id="from" placeholder="Sted, adresse eller holdeplass" required>
+        </div>
+        <div class="field">
+          <label class="lbl" for="to">Til</label>
+          <input type="search" id="to" placeholder="Sted, adresse eller holdeplass" required>
+        </div>
+      </div>
+      <button type="button" class="iconbtn" id="swap" title="Bytt fra og til" aria-label="Bytt fra og til">⇅</button>
+    </div>
+    <div class="row">
+      <div class="seg" role="group" aria-label="Avreise eller ankomst">
+        <button type="button" id="depBtn" aria-pressed="true">Avreise</button>
+        <button type="button" id="arrBtn" aria-pressed="false">Framme</button>
+      </div>
+      <div>
+        <label class="lbl" for="when">Tidspunkt</label>
+        <input type="datetime-local" id="when">
+      </div>
+    </div>
+    <div>
+      <label class="lbl">Transportmidler</label>
+      <div class="chips" id="modeChips"></div>
+    </div>
+    <div class="row" style="align-items:center">
+      <button type="button" class="linkbtn" id="useGeo" style="flex:0 0 auto">Bruk min posisjon som fra</button>
+    </div>
+    <button class="go" type="submit">Finn reise</button>
+    <div id="recentWrap" hidden>
+      <label class="lbl">Siste søk</label>
+      <div class="recent" id="recent"></div>
+    </div>
+  </form>
+  <div id="tripOut"></div>
+</section>
+
+<!-- AVGANGER -->
+<section class="pane" id="pane-avg" hidden>
+  <form class="form" id="depForm" autocomplete="off">
+    <div class="field">
+      <label class="lbl" for="stop">Holdeplass, stasjon eller ferjekai</label>
+      <input type="search" id="stop" placeholder="f.eks. Moss ferjekai, Bodø sentrum, Bergen stasjon">
+    </div>
+    <div>
+      <label class="lbl">Vis</label>
+      <div class="chips" id="depChips"></div>
+    </div>
+    <div id="favWrap" hidden>
+      <label class="lbl">Lagrede stopp</label>
+      <div class="recent" id="favs"></div>
+    </div>
+  </form>
+  <div id="depOut"></div>
+</section>
+
+<!-- FLY -->
+<section class="pane" id="pane-fly" hidden>
+  <form class="form" id="flyForm">
+    <div class="row">
+      <div>
+        <label class="lbl" for="airport">Flyplass</label>
+        <select id="airport"></select>
+      </div>
+      <div class="seg" role="group" aria-label="Avganger eller ankomster">
+        <button type="button" id="flyDep" aria-pressed="true">Avganger</button>
+        <button type="button" id="flyArr" aria-pressed="false">Ankomster</button>
+      </div>
+    </div>
+    <div class="field">
+      <label class="lbl" for="flyFilter">Filtrer (by, flightnummer, selskap)</label>
+      <input type="search" id="flyFilter" placeholder="f.eks. Bodø, WF, SK4">
+    </div>
+  </form>
+  <div id="flyOut"></div>
+  <p class="hint">Offisielle flytider og status fra Avinor, oppdatert hvert minutt. Gjelder Avinors 43 lufthavner og Sandefjord lufthavn Torp. For Torp mangler gate i datagrunnlaget; den står på torp.no.</p>
+</section>
+
+<footer>
+  Data: <a href="https://developer.entur.org" target="_blank" rel="noopener">Entur</a> (alle kollektivruter i Norge, NLOD) og Avinor via <a href="https://allemannsdata.com/wiki/kilder/avinor/" target="_blank" rel="noopener">allemannsdata.com</a>. Sanntid der operatøren sender det. Billetter kjøpes i Entur-appen eller hos operatøren.
+</footer>
+</div>
+
+<script>
+"use strict";
+const CLIENT = "sabajan-reisesok";
+const JP = "https://api.entur.io/journey-planner/v3/graphql";
+const GEO = "https://api.entur.io/geocoder/v1";
+const AVINOR = "https://allemannsdata.com/wiki/api/v1/kilder/avinor";
+
+const MODES = [
+  {key:"bus",   name:"Buss",   api:["bus","coach"], css:"--m-bus"},
+  {key:"rail",  name:"Tog",    api:["rail"],        css:"--m-rail"},
+  {key:"tram",  name:"Trikk/T-bane", api:["tram","metro"], css:"--m-tram"},
+  {key:"water", name:"Båt/ferje", api:["water"],    css:"--m-water"},
+  {key:"air",   name:"Fly",    api:["air"],         css:"--m-air"},
+];
+const MODE_CSS = {bus:"--m-bus",coach:"--m-coach",rail:"--m-rail",tram:"--m-tram",metro:"--m-metro",water:"--m-water",air:"--m-air",foot:"--m-foot",cableway:"--m-other",funicular:"--m-other",lift:"--m-other",taxi:"--m-other"};
+const MODE_NAME = {bus:"Buss",coach:"Ekspressbuss",rail:"Tog",tram:"Trikk",metro:"T-bane",water:"Båt",air:"Fly",foot:"Gå",cableway:"Taubane",funicular:"Kabelbane",taxi:"Taxi"};
+const SUBMODE_NAME = {localCarFerry:"Bilferje",nationalCarFerry:"Bilferje",regionalCarFerry:"Bilferje",highSpeedPassengerService:"Hurtigbåt",highSpeedVehicleService:"Hurtigbåt",localPassengerFerry:"Passasjerbåt",sightseeingService:"Turistbåt",domesticFlight:"Innenriksfly",internationalFlight:"Utenriksfly",airportLinkRail:"Flytog",airportLinkBus:"Flybuss",expressBus:"Ekspressbuss",nightBus:"Nattbuss",railReplacementBus:"Buss for tog",longDistance:"Fjerntog",regionalRail:"Regiontog",local:"Lokaltog",nightRail:"Nattog",touristRailway:"Turisttog"};
+
+/* Avinor-lufthavner: IATA, visningsnavn, søkeord for å kjenne igjen Entur-navn */
+const AIRPORTS = [
+ ["OSL","Oslo lufthavn Gardermoen","oslo lufthavn|gardermoen"],["BGO","Bergen lufthavn Flesland","bergen lufthavn|flesland"],
+ ["TRD","Trondheim lufthavn Værnes","trondheim lufthavn|værnes"],["SVG","Stavanger lufthavn Sola","stavanger lufthavn|sola"],
+ ["TOS","Tromsø lufthavn","tromsø lufthavn|langnes"],["BOO","Bodø lufthavn","bodø lufthavn"],
+ ["AES","Ålesund lufthavn Vigra","ålesund lufthavn|vigra"],["KRS","Kristiansand lufthavn Kjevik","kristiansand lufthavn|kjevik"],
+ ["HAU","Haugesund lufthavn Karmøy","haugesund lufthavn|karmøy lufthavn"],["MOL","Molde lufthavn Årø","molde lufthavn|årø"],
+ ["KSU","Kristiansund lufthavn Kvernberget","kristiansund lufthavn|kvernberget"],["EVE","Harstad/Narvik lufthavn Evenes","evenes"],
+ ["ALF","Alta lufthavn","alta lufthavn"],["KKN","Kirkenes lufthavn Høybuktmoen","kirkenes lufthavn|høybuktmoen"],
+ ["LKL","Lakselv lufthavn Banak","lakselv lufthavn|banak"],["BDU","Bardufoss lufthavn","bardufoss"],
+ ["ANX","Andøya lufthavn Andenes","andøya lufthavn|andenes lufthavn"],["LYR","Svalbard lufthavn Longyear","svalbard lufthavn|longyear"],
+ ["HFT","Hammerfest lufthavn","hammerfest lufthavn"],["VDS","Vadsø lufthavn","vadsø lufthavn"],["VAW","Vardø lufthavn Svartnes","vardø lufthavn|svartnes"],
+ ["BJF","Båtsfjord lufthavn","båtsfjord lufthavn"],["BVG","Berlevåg lufthavn","berlevåg lufthavn"],["MEH","Mehamn lufthavn","mehamn lufthavn"],
+ ["HVG","Honningsvåg lufthavn Valan","honningsvåg lufthavn|valan"],["SOJ","Sørkjosen lufthavn","sørkjosen lufthavn"],["HAA","Hasvik lufthavn","hasvik lufthavn"],
+ ["SKN","Stokmarknes lufthavn Skagen","stokmarknes lufthavn|skagen lufthavn"],["SVJ","Svolvær lufthavn Helle","svolvær lufthavn|helle"],
+ ["LKN","Leknes lufthavn","leknes lufthavn"],["VRY","Værøy helikopterhavn","værøy heli"],["RET","Røst lufthavn","røst lufthavn"],
+ ["MQN","Mo i Rana lufthavn Ytteren","mo i rana lufthavn|ytteren|røssvoll"],["MJF","Mosjøen lufthavn Kjærstad","mosjøen lufthavn|kjærstad"],
+ ["SSJ","Sandnessjøen lufthavn Stokka","sandnessjøen lufthavn|stokka"],["BNN","Brønnøysund lufthavn Brønnøy","brønnøysund lufthavn|brønnøy lufthavn"],
+ ["RVK","Rørvik lufthavn Ryum","rørvik lufthavn|ryum"],["OSY","Namsos lufthavn","namsos lufthavn"],["RRS","Røros lufthavn","røros lufthavn"],
+ ["FRO","Florø lufthavn","florø lufthavn"],["FDE","Førde lufthavn Bringeland","førde lufthavn|bringeland"],["SOG","Sogndal lufthavn Haukåsen","sogndal lufthavn|haukåsen"],
+ ["HOV","Ørsta-Volda lufthavn Hovden","ørsta|hovden"],["TRF","Sandefjord lufthavn Torp","sandefjord lufthavn|torp lufthavn"],["SDN","Sandane lufthavn Anda","sandane lufthavn|anda"]
+];
+const AIRLINES = {SK:"SAS",DY:"Norwegian",D8:"Norwegian",WF:"Widerøe",FR:"Ryanair",W6:"Wizz Air",KL:"KLM",LH:"Lufthansa",AY:"Finnair",BA:"British Airways",AF:"Air France",TK:"Turkish Airlines",DX:"DAT",U2:"easyJet",LX:"Swiss",OS:"Austrian",SN:"Brussels Airlines",TP:"TAP",IB:"Iberia",VY:"Vueling",QR:"Qatar Airways",EK:"Emirates",FI:"Icelandair",BT:"airBaltic",LO:"LOT",EW:"Eurowings",DE:"Condor",X3:"TUI fly",BY:"TUI",PC:"Pegasus",HV:"Transavia",LM:"Loganair",N0:"Norse",DS:"easyJet",RC:"Atlantic Airways",SI:"Blue Islands",JU:"Air Serbia",A3:"Aegean",EI:"Aer Lingus",MT:"Enter Air",XQ:"SunExpress",TO:"Transavia France",W4:"Wizz Air Malta",L6:"Mauritania",E4:"Enter Air",V7:"Volotea",LTR:"Lufttransport (helikopter)",RK:"Ryanair"};
+const FLIGHT_STATUS = {A:["Landet","ok"],D:["Avreist","ok"],E:["Ny tid","late"],C:["Innstilt","bad"],N:["Ny info","late"]};
+function flightStatus(f){ // «Ny tid» med samme klokkeslett betyr i rute
+  const c = f.status?.code; if (!c) return null;
+  if (c === "E" && f.status.time && Math.abs(new Date(f.status.time) - new Date(f.schedule_time)) < 60000) return null;
+  return FLIGHT_STATUS[c] || null;
+}
+
+/* ---------- hjelpere ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const hm = iso => new Date(iso).toLocaleTimeString("nb-NO",{hour:"2-digit",minute:"2-digit"});
+const dayKey = d => d.toDateString();
+function dateLabel(iso){
+  const d = new Date(iso), now = new Date(), tm = new Date(now); tm.setDate(now.getDate()+1);
+  if (dayKey(d) === dayKey(now)) return "i dag";
+  if (dayKey(d) === dayKey(tm)) return "i morgen";
+  return d.toLocaleDateString("nb-NO",{weekday:"short",day:"numeric",month:"short"});
+}
+const dur = s => { const m = Math.round(s/60); if (m < 60) return m + " min"; const h = Math.floor(m/60), r = m%60; return h + " t" + (r ? " " + r + " min" : ""); };
+const delayMin = (aimed, exp) => Math.round((new Date(exp) - new Date(aimed)) / 60000);
+const nbText = arr => { if (!arr || !arr.length) return ""; const n = arr.find(x => x.language === "no" || x.language === "nob" || x.language === "nb"); return (n || arr[0]).value; };
+const store = {
+  get(k, d){ try { const v = localStorage.getItem("reisesok:"+k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v){ try { localStorage.setItem("reisesok:"+k, JSON.stringify(v)); } catch {} }
+};
+function localIso(d){ // ISO med tidssoneforskyvning
+  const off = -d.getTimezoneOffset(), sign = off >= 0 ? "+" : "-", p = n => String(Math.abs(n)).padStart(2,"0");
+  return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours())+":"+p(d.getMinutes())+":00"+sign+p(Math.floor(Math.abs(off)/60))+":"+p(Math.abs(off)%60);
+}
+function inputNow(){ const d = new Date(); d.setSeconds(0,0); const p = n => String(n).padStart(2,"0"); return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours())+":"+p(d.getMinutes()); }
+
+async function gql(query, variables){
+  const r = await fetch(JP, {method:"POST", headers:{"Content-Type":"application/json","ET-Client-Name":CLIENT}, body:JSON.stringify({query, variables})});
+  if (!r.ok) throw new Error("Entur svarte med feil " + r.status);
+  const j = await r.json();
+  if (j.errors && !j.data) throw new Error(j.errors[0].message);
+  return j.data;
+}
+async function geocode(text, stopsOnly){
+  const u = new URL(GEO + "/autocomplete");
+  u.searchParams.set("text", text); u.searchParams.set("size", "8"); u.searchParams.set("lang", "no");
+  if (stopsOnly) u.searchParams.set("layers", "venue");
+  const r = await fetch(u, {headers:{"ET-Client-Name":CLIENT}});
+  const j = await r.json();
+  let f = j.features || [];
+  if (stopsOnly) f = f.filter(x => String(x.properties.id).startsWith("NSR:StopPlace"));
+  return f.map(x => ({ id:x.properties.id, name:x.properties.name, label:x.properties.label, locality:x.properties.locality || x.properties.county || "", cats:x.properties.category || [], lat:x.geometry.coordinates[1], lon:x.geometry.coordinates[0] }));
+}
+const CAT_CSS = {onstreetBus:"--m-bus",busStation:"--m-bus",coachStation:"--m-coach",railStation:"--m-rail",metroStation:"--m-metro",onstreetTram:"--m-tram",tramStation:"--m-tram",harbourPort:"--m-water",ferryPort:"--m-water",ferryStop:"--m-water",airport:"--m-air"};
+
+/* ---------- autofullføring ---------- */
+function attachAC(input, {stopsOnly=false, onPick}){
+  let box = null, items = [], hl = -1, timer = null, seq = 0;
+  const close = () => { box?.remove(); box = null; hl = -1; };
+  const render = () => {
+    close(); if (!items.length) return;
+    box = document.createElement("div"); box.className = "ac"; box.setAttribute("role","listbox");
+    items.forEach((it,i) => {
+      const b = document.createElement("button"); b.type = "button"; if (i === hl) b.className = "hl";
+      const dots = [...new Set(it.cats.map(c => CAT_CSS[c]).filter(Boolean))].map(v => `<i class="dot" style="background:var(${v})"></i>`).join("");
+      b.innerHTML = `<span><b>${esc(it.name)}</b><br><span class="where">${esc(it.locality)}</span></span><span class="kinds">${dots}</span>`;
+      b.addEventListener("mousedown", e => { e.preventDefault(); pick(it); });
+      box.appendChild(b);
+    });
+    input.parentElement.appendChild(box);
+  };
+  const pick = it => { input.value = it.name + (it.locality && !it.name.includes(it.locality) ? ", " + it.locality : ""); input._place = it; close(); onPick?.(it); };
+  input.addEventListener("input", () => {
+    input._place = null; clearTimeout(timer);
+    const q = input.value.trim(); if (q.length < 2) { items = []; close(); return; }
+    timer = setTimeout(async () => { const my = ++seq; try { const r = await geocode(q, stopsOnly); if (my !== seq) return; items = r; hl = -1; render(); } catch {} }, 180);
+  });
+  input.addEventListener("keydown", e => {
+    if (!box) return;
+    if (e.key === "ArrowDown"){ hl = Math.min(items.length-1, hl+1); render(); e.preventDefault(); }
+    else if (e.key === "ArrowUp"){ hl = Math.max(0, hl-1); render(); e.preventDefault(); }
+    else if (e.key === "Enter" && hl >= 0){ pick(items[hl]); e.preventDefault(); }
+    else if (e.key === "Escape") close();
+  });
+  input.addEventListener("blur", () => setTimeout(close, 120));
+  return { pickFirst: async () => { if (input._place) return input._place; const q = input.value.trim(); if (!q) return null; const r = await geocode(q, stopsOnly); if (r[0]) { pick(r[0]); return r[0]; } return null; } };
+}
+const toLoc = p => p.id && (p.id.startsWith("NSR:") ) ? {place:p.id, name:p.name} : {coordinates:{latitude:p.lat, longitude:p.lon}, name:p.name};
+
+/* ---------- faner ---------- */
+function showTab(name){
+  document.querySelectorAll("nav.tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.pane === name));
+  ["reise","avg","fly"].forEach(p => $("#pane-"+p).hidden = p !== name);
+  store.set("tab", name);
+  if (name === "fly" && !$("#flyOut").innerHTML) loadFlights();
+}
+document.querySelectorAll("nav.tabs button").forEach(b => b.addEventListener("click", () => showTab(b.dataset.pane)));
+
+/* ---------- modus-chips ---------- */
+function makeChips(el, key){
+  const state = store.get(key, Object.fromEntries(MODES.map(m => [m.key, true])));
+  MODES.forEach(m => {
+    const b = document.createElement("button"); b.type = "button"; b.className = "chip";
+    b.setAttribute("aria-pressed", state[m.key] !== false);
+    b.innerHTML = `<i style="background:var(${m.css})"></i>${m.name}`;
+    b.addEventListener("click", () => { state[m.key] = !(state[m.key] !== false); b.setAttribute("aria-pressed", state[m.key]); store.set(key, state); el.dispatchEvent(new Event("change")); });
+    el.appendChild(b);
+  });
+  return () => { const on = MODES.filter(m => state[m.key] !== false); return on.length === MODES.length ? null : on.flatMap(m => m.api); };
+}
+
+/* =================== REISE =================== */
+const getTripModes = makeChips($("#modeChips"), "tripModes");
+const fromAC = attachAC($("#from"), {});
+const toAC = attachAC($("#to"), {});
+let arriveBy = false, lastQuery = null;
+$("#when").value = inputNow();
+$("#depBtn").onclick = () => { arriveBy = false; $("#depBtn").setAttribute("aria-pressed","true"); $("#arrBtn").setAttribute("aria-pressed","false"); };
+$("#arrBtn").onclick = () => { arriveBy = true; $("#arrBtn").setAttribute("aria-pressed","true"); $("#depBtn").setAttribute("aria-pressed","false"); };
+$("#swap").onclick = () => { const a = $("#from"), b = $("#to"); [a.value, b.value] = [b.value, a.value]; [a._place, b._place] = [b._place, a._place]; };
+$("#useGeo").onclick = () => {
+  if (!navigator.geolocation) { $("#useGeo").textContent = "Posisjon er ikke tilgjengelig i denne nettleseren"; return; }
+  $("#useGeo").textContent = "Henter posisjon …";
+  navigator.geolocation.getCurrentPosition(async pos => {
+    const {latitude:lat, longitude:lon} = pos.coords; let name = "Min posisjon";
+    try { const r = await fetch(`${GEO}/reverse?point.lat=${lat}&point.lon=${lon}&size=1&lang=no`, {headers:{"ET-Client-Name":CLIENT}}); const j = await r.json(); if (j.features?.[0]) name = j.features[0].properties.name; } catch {}
+    $("#from").value = name; $("#from")._place = {id:"", name, lat, lon, cats:[]};
+    $("#useGeo").textContent = "Bruk min posisjon som fra";
+  }, () => { $("#useGeo").textContent = "Fikk ikke posisjon. Skriv stedet i stedet."; }, {enableHighAccuracy:true, timeout:10000});
+};
+
+const TRIP_Q = `query($from:Location!,$to:Location!,$dt:DateTime,$arriveBy:Boolean,$modes:Modes,$cursor:String){
+ trip(from:$from,to:$to,dateTime:$dt,arriveBy:$arriveBy,modes:$modes,numTripPatterns:6,pageCursor:$cursor){
+  previousPageCursor nextPageCursor
+  tripPatterns{ expectedStartTime expectedEndTime aimedStartTime aimedEndTime duration walkDistance
+   legs{ mode transportSubmode distance duration realtime aimedStartTime expectedStartTime aimedEndTime expectedEndTime
+    fromPlace{name quay{publicCode name}} toPlace{name quay{publicCode}}
+    line{publicCode name presentation{colour textColour}}
+    operator{name} authority{name}
+    fromEstimatedCall{destinationDisplay{frontText} cancellation}
+    situations{summary{value language} description{value language}}
+    intermediateEstimatedCalls{quay{name} expectedDepartureTime}
+ }}}}`;
+
+$("#tripForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const out = $("#tripOut"); out.innerHTML = `<div class="status">Leter etter ruter …</div>`;
+  try {
+    const [f, t] = await Promise.all([fromAC.pickFirst(), toAC.pickFirst()]);
+    if (!f || !t) { out.innerHTML = `<div class="err">Fant ikke ${!f ? "fra-stedet" : "til-stedet"}. Prøv et annet navn eller velg fra lista.</div>`; return; }
+    const when = $("#when").value ? new Date($("#when").value) : new Date();
+    const api = getTripModes();
+    lastQuery = { from:toLoc(f), to:toLoc(t), dt:localIso(when), arriveBy, modes: api ? {transportModes: api.map(m => ({transportMode:m})), accessMode:"foot", egressMode:"foot"} : null };
+    saveRecent(f, t);
+    await runTrip(null);
+  } catch (err) { out.innerHTML = `<div class="err">Søket feilet: ${esc(err.message)}. Sjekk nettforbindelsen og prøv igjen.</div>`; }
+});
+
+async function runTrip(cursor, back = false){
+  const out = $("#tripOut");
+  if (cursor) out.querySelector(".pager")?.replaceChildren(Object.assign(document.createElement("div"),{className:"status",textContent:"Henter …"}));
+  let d = await gql(TRIP_Q, {...lastQuery, cursor});
+  // Glisne ruter (ferje, fly, helg): Enturs søkevindu er kort, så let videre i samme retning
+  for (let i = 0; i < 4 && !d.trip.tripPatterns.length; i++){
+    const next = back || (!cursor && lastQuery.arriveBy) ? d.trip.previousPageCursor : d.trip.nextPageCursor;
+    if (!next) break;
+    out.innerHTML = `<div class="status">Leter lenger ${back || lastQuery.arriveBy ? "tilbake" : "fram"} i tid …</div>`;
+    d = await gql(TRIP_Q, {...lastQuery, cursor:next});
+  }
+  const tp = d.trip.tripPatterns.slice().sort((a,b) => new Date(a.expectedStartTime) - new Date(b.expectedStartTime));
+  if (!tp.length) { out.innerHTML = `<div class="status">Ingen reiser funnet det neste døgnet med disse valgene. Prøv et annet tidspunkt eller slå på flere transportmidler.</div>`; return; }
+  out.innerHTML = `<div class="results">${tp.map((p,i) => tripCard(p,i)).join("")}</div>
+    <div class="pager"><button type="button" id="prevP" ${d.trip.previousPageCursor ? "" : "disabled"}>← Tidligere</button><button type="button" id="nextP" ${d.trip.nextPageCursor ? "" : "disabled"}>Senere →</button></div>`;
+  $("#prevP").onclick = () => runTrip(d.trip.previousPageCursor, true).catch(showTripErr);
+  $("#nextP").onclick = () => runTrip(d.trip.nextPageCursor).catch(showTripErr);
+  out.querySelectorAll(".trip>button.head").forEach(b => b.addEventListener("click", () => {
+    const legs = b.nextElementSibling; legs.hidden = !legs.hidden; b.setAttribute("aria-expanded", !legs.hidden);
+    if (!legs.hidden) enrichFlights(legs, tp[+b.dataset.i]);
+  }));
+  const first = out.querySelector(".trip>button.head"); if (first) first.click();
+}
+function showTripErr(err){ $("#tripOut").insertAdjacentHTML("beforeend", `<div class="err">${esc(err.message)}</div>`); }
+
+function tripCard(p, i){
+  const legs = p.legs, transit = legs.filter(l => l.mode !== "foot");
+  const changes = Math.max(0, transit.length - 1);
+  const total = legs.reduce((s,l) => s + l.duration, 0) || 1;
+  const bar = legs.map(l => {
+    const pct = Math.max(4, l.duration/total*100);
+    if (l.mode === "foot") return `<span class="seg-leg foot" style="flex:${pct}" title="Gå ${dur(l.duration)}"></span>`;
+    const c = l.line?.presentation?.colour ? "#"+l.line.presentation.colour : `var(${MODE_CSS[l.mode]||"--m-other"})`;
+    const tc = l.line?.presentation?.textColour ? "#"+l.line.presentation.textColour : "#fff";
+    const code = l.line?.publicCode || (l.mode === "air" ? "✈" : MODE_NAME[l.mode] || "");
+    return `<span class="seg-leg" style="flex:${pct};background:${c};color:${tc}" title="${esc(MODE_NAME[l.mode]||l.mode)} ${esc(code)}">${esc(code)}</span>`;
+  }).join("");
+  const tags = [];
+  const dl = delayMin(p.aimedStartTime, p.expectedStartTime);
+  if (dl >= 2) tags.push(`<span class="tag late">${dl} min forsinket</span>`);
+  if (legs.some(l => l.fromEstimatedCall?.cancellation)) tags.push(`<span class="tag bad">Innstilt del</span>`);
+  if (legs.some(l => l.situations?.length)) tags.push(`<span class="tag late">Avvik</span>`);
+  const kinds = [...new Set(transit.map(l => SUBMODE_NAME[l.transportSubmode] || MODE_NAME[l.mode]))];
+  kinds.forEach(k => tags.push(`<span class="tag">${esc(k)}</span>`));
+  if (p.walkDistance > 50) tags.push(`<span class="tag">Gå ${Math.round(p.walkDistance)} m</span>`);
+  const dayNote = dateLabel(p.expectedStartTime) !== "i dag" ? `<s>${esc(dateLabel(p.expectedStartTime))}</s>` : "";
+  return `<article class="trip">
+    <button class="head" type="button" data-i="${i}" aria-expanded="false">
+      <span class="times">${dayNote}${hm(p.expectedStartTime)} – ${hm(p.expectedEndTime)}</span>
+      <span></span>
+      <span class="meta"><b>${dur(p.duration)}</b><br>${changes === 0 ? "Direkte" : changes + (changes === 1 ? " bytte" : " bytter")}</span>
+      <span class="bar">${bar}</span>
+      <span class="tags">${tags.join("")}</span>
+    </button>
+    <div class="legs" hidden>${legsHtml(legs)}</div>
+  </article>`;
+}
+function legsHtml(legs){
+  let h = "";
+  legs.forEach((l, idx) => {
+    const cvar = MODE_CSS[l.mode] || "--m-other";
+    const style = l.line?.presentation?.colour ? `--c:#${l.line.presentation.colour}` : `--c:var(${cvar})`;
+    const dl = delayMin(l.aimedStartTime, l.expectedStartTime);
+    const tHtml = `${hm(l.expectedStartTime)}${dl >= 2 ? `<s>${hm(l.aimedStartTime)}</s>` : ""}`;
+    const quay = l.fromPlace.quay?.publicCode;
+    if (l.mode === "foot"){
+      h += `<div class="leg foot"><div class="t">${hm(l.expectedStartTime)}</div><div class="rail"></div><div class="body"><span class="stop">${esc(l.fromPlace.name)}</span><div class="detail">Gå ${Math.round(l.distance)} m · ${dur(l.duration)}</div></div></div>`;
+      return;
+    }
+    const kind = SUBMODE_NAME[l.transportSubmode] || MODE_NAME[l.mode] || l.mode;
+    const code = l.line?.publicCode || "";
+    const front = l.fromEstimatedCall?.destinationDisplay?.frontText || l.line?.name || "";
+    const op = l.operator?.name || l.authority?.name || "";
+    const inter = l.intermediateEstimatedCalls || [];
+    const sits = (l.situations || []).map(s => `<div class="alert">⚠ ${esc(nbText(s.summary) || nbText(s.description))}</div>`).join("");
+    const cancel = l.fromEstimatedCall?.cancellation ? `<div class="alert" style="background:var(--bad-bg);color:var(--bad)">Denne avgangen er innstilt</div>` : "";
+    h += `<div class="leg" style="${style}" data-mode="${l.mode}" data-from="${esc(l.fromPlace.name)}" data-to="${esc(l.toPlace.name)}" data-aimed="${esc(l.aimedStartTime)}" data-op="${esc(op)}">
+      <div class="t">${tHtml}</div><div class="rail"></div>
+      <div class="body">
+        <span class="stop">${esc(l.fromPlace.name)}</span>${quay ? ` <span class="small">${l.mode === "rail" ? "spor" : "plf."} ${esc(quay)}</span>` : ""}
+        <div class="line">${code ? `<span class="badge">${esc(code)}</span>` : ""}<span>${esc(kind)} ${front ? "mot " + esc(front) : ""}</span></div>
+        <div class="detail">${esc(op)} · ${dur(l.duration)}${l.realtime ? " · sanntid" : ""}${dl >= 2 ? ` · <b style="color:var(--late)">${dl} min forsinket</b>` : ""}</div>
+        ${inter.length ? `<details class="stops"><summary>${inter.length} stopp underveis</summary><ol>${inter.map(c => `<li>${hm(c.expectedDepartureTime)} ${esc(c.quay?.name)}</li>`).join("")}</ol></details>` : ""}
+        ${cancel}${sits}
+        ${l.mode === "air" ? `<div class="flight" data-flight>Henter flightnummer og gate fra Avinor …</div>` : ""}
+      </div></div>`;
+    const next = legs[idx+1];
+    if (!next || next.mode === "foot" && idx+1 === legs.length-1) {} // sluttpunkt vises under
+  });
+  const last = legs[legs.length-1];
+  h += `<div class="end"><div class="t">${hm(last.expectedEndTime)}</div><div></div><div><span class="stop">${esc(last.toPlace.name)}</span>${last.toPlace.quay?.publicCode ? ` <span class="small">plf. ${esc(last.toPlace.quay.publicCode)}</span>` : ""}</div></div>`;
+  return h;
+}
+
+/* Avinor-berikelse av fly-etapper */
+function iataFor(name){
+  const n = (name || "").toLowerCase();
+  const hit = AIRPORTS.find(a => a[2].split("|").some(k => n.includes(k)));
+  return hit ? hit[0] : null;
+}
+const flightCache = {};
+async function avinorFlights(iata, dir){
+  const k = iata+dir, c = flightCache[k];
+  if (c && Date.now() - c.t < 60000) return c.data;
+  const u = `${AVINOR}/get_flights?airport_id=${iata}&direction=${dir}&hours_back=1&hours_ahead=36&max_results=1000&limit=100`;
+  let all = [], offset = 0;
+  for (let page = 0; page < 10; page++){
+    const r = await fetch(u + "&offset=" + offset); const j = await r.json();
+    if (!j.data) throw new Error(j.error?.message || "Avinor svarte ikke");
+    const got = j.data.flights || [];
+    all = all.concat(got);
+    if (!j.data.has_more_results || !got.length) break;
+    offset += got.length;
+  }
+  flightCache[k] = {t:Date.now(), data:all};
+  return all;
+}
+async function enrichFlights(legsEl){
+  for (const leg of legsEl.querySelectorAll('.leg[data-mode="air"]')){
+    const box = leg.querySelector("[data-flight]"); if (!box || box.dataset.done) continue;
+    box.dataset.done = 1;
+    const from = iataFor(leg.dataset.from), to = iataFor(leg.dataset.to);
+    if (!from) { box.textContent = "Flyplassen er ikke en Avinor-lufthavn, så flightnummer og gate mangler."; continue; }
+    try {
+      const fl = await avinorFlights(from, "departures");
+      const aimed = new Date(leg.dataset.aimed).getTime();
+      const cand = fl.filter(f => (!to || f.airport === to) && Math.abs(new Date(f.schedule_time).getTime() - aimed) <= 15*60000);
+      const f = cand.sort((a,b) => Math.abs(new Date(a.schedule_time)-aimed) - Math.abs(new Date(b.schedule_time)-aimed))[0];
+      if (!f) { box.textContent = "Avinor har ikke denne avgangen ennå (de viser rundt ett døgn fram). Sjekk nærmere avreise."; continue; }
+      const st = flightStatus(f);
+      box.innerHTML = `<b>${esc(f.flight_id)}</b> · ${esc(AIRLINES[f.airline] || f.airline)} · planlagt ${hm(f.schedule_time)}${f.gate ? ` · gate <b>${esc(f.gate)}</b>` : ""}${st ? ` · <span class="st ${st[1]}">${st[0]}${f.status.time ? " " + hm(f.status.time) : ""}</span>` : ""}`;
+    } catch (err) { box.textContent = "Fikk ikke kontakt med Avinor akkurat nå."; }
+  }
+}
+
+/* siste søk */
+function saveRecent(f, t){
+  const list = store.get("recent", []).filter(r => !(r.f.name === f.name && r.t.name === t.name));
+  list.unshift({f, t}); store.set("recent", list.slice(0,6)); renderRecent();
+}
+function renderRecent(){
+  const list = store.get("recent", []); $("#recentWrap").hidden = !list.length;
+  $("#recent").innerHTML = "";
+  list.forEach(r => {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = `${r.f.name} → ${r.t.name}`;
+    b.onclick = () => { $("#from").value = r.f.name; $("#from")._place = r.f; $("#to").value = r.t.name; $("#to")._place = r.t; $("#when").value = inputNow(); $("#tripForm").requestSubmit(); };
+    $("#recent").appendChild(b);
+  });
+}
+renderRecent();
+
+/* =================== AVGANGER =================== */
+const getDepModes = makeChips($("#depChips"), "depModes");
+let currentStop = null, depTimer = null;
+attachAC($("#stop"), {stopsOnly:true, onPick: p => { currentStop = p; loadDeps(); }});
+$("#depChips").addEventListener("change", () => currentStop && loadDeps());
+$("#depForm").addEventListener("submit", async e => { e.preventDefault(); const r = await geocode($("#stop").value, true); if (r[0]) { $("#stop").value = r[0].name; currentStop = r[0]; loadDeps(); } });
+
+const DEP_Q = `query($id:String!,$modes:[TransportMode]){stopPlace(id:$id){name
+  estimatedCalls(numberOfDepartures:40,timeRange:172800,whiteListedModes:$modes){
+   realtime aimedDepartureTime expectedDepartureTime cancellation
+   quay{publicCode name} destinationDisplay{frontText}
+   serviceJourney{transportSubmode line{publicCode name transportMode presentation{colour textColour} operator{name}}}
+   situations{summary{value language}}}}}`;
+
+async function loadDeps(){
+  clearInterval(depTimer);
+  const out = $("#depOut"), stop = currentStop; if (!stop) return;
+  if (!out.querySelector(".board")) out.innerHTML = `<div class="status">Henter avganger …</div>`;
+  try {
+    const d = await gql(DEP_Q, {id:stop.id, modes:getDepModes()});
+    if (stop !== currentStop) return;
+    const calls = d.stopPlace?.estimatedCalls || [];
+    const favs = store.get("favs", []); const isFav = favs.some(f => f.id === stop.id);
+    out.innerHTML = `<div class="boardhead"><h2>${esc(d.stopPlace?.name || stop.name)}</h2>
+      <span class="small">Oppdatert ${hm(new Date().toISOString())} · <button type="button" class="linkbtn" id="favBtn">${isFav ? "Fjern fra lagrede" : "Lagre stopp"}</button></span></div>
+      ${calls.length ? `<div class="board">${calls.map(depRow).join("")}</div>` : `<div class="status">Ingen avganger de neste to døgnene med valgte transportmidler.</div>`}`;
+    $("#favBtn").onclick = () => toggleFav(stop);
+    depTimer = setInterval(loadDeps, 30000);
+  } catch (err) { out.innerHTML = `<div class="err">Fikk ikke hentet avganger: ${esc(err.message)}</div>`; }
+}
+function depRow(c){
+  const line = c.serviceJourney.line, m = line.transportMode;
+  const bg = line.presentation?.colour ? "#"+line.presentation.colour : `var(${MODE_CSS[m]||"--m-other"})`;
+  const fg = line.presentation?.textColour ? "#"+line.presentation.textColour : "#fff";
+  const dl = delayMin(c.aimedDepartureTime, c.expectedDepartureTime);
+  const mins = Math.round((new Date(c.expectedDepartureTime) - Date.now())/60000);
+  const rel = mins <= 0 ? "nå" : mins < 15 ? mins + " min" : dateLabel(c.expectedDepartureTime) === "i dag" ? "" : dateLabel(c.expectedDepartureTime);
+  const kind = SUBMODE_NAME[c.serviceJourney.transportSubmode] || MODE_NAME[m] || m;
+  const sit = c.situations?.length ? ` · <span class="st late">⚠ ${esc(nbText(c.situations[0].summary))}</span>` : "";
+  const q = c.quay?.publicCode;
+  return `<div class="dep${c.cancellation ? " cancel" : ""}">
+    <div class="t">${hm(c.expectedDepartureTime)}${dl >= 2 ? `<s>${hm(c.aimedDepartureTime)}</s>` : ""}</div>
+    <span class="badge" style="background:${bg};color:${fg}">${esc(line.publicCode || kind)}</span>
+    <div class="dest"><b>${esc(c.destinationDisplay?.frontText || line.name)}</b><span>${esc(kind)} · ${esc(line.operator?.name || "")}${c.cancellation ? ' · <span class="st bad">Innstilt</span>' : ""}${sit}</span></div>
+    <div class="right"><b>${esc(rel)}</b>${q ? (m === "rail" ? "spor " : "plf. ") + esc(q) : ""}${c.realtime ? "" : " · rutetid"}</div>
+  </div>`;
+}
+function toggleFav(stop){
+  let favs = store.get("favs", []);
+  favs = favs.some(f => f.id === stop.id) ? favs.filter(f => f.id !== stop.id) : [{id:stop.id, name:stop.name, locality:stop.locality, cats:[]}, ...favs].slice(0,10);
+  store.set("favs", favs); renderFavs(); loadDeps();
+}
+function renderFavs(){
+  const favs = store.get("favs", []); $("#favWrap").hidden = !favs.length; $("#favs").innerHTML = "";
+  favs.forEach(f => { const b = document.createElement("button"); b.type = "button"; b.textContent = f.name; b.onclick = () => { $("#stop").value = f.name; currentStop = f; loadDeps(); }; $("#favs").appendChild(b); });
+}
+renderFavs();
+
+/* =================== FLY =================== */
+let flyDir = "departures", flyTimer = null;
+$("#airport").innerHTML = AIRPORTS.map(a => `<option value="${a[0]}">${esc(a[1])} (${a[0]})</option>`).join("");
+$("#airport").value = store.get("airport", "OSL");
+$("#airport").onchange = () => { store.set("airport", $("#airport").value); loadFlights(); };
+$("#flyDep").onclick = () => { flyDir = "departures"; $("#flyDep").setAttribute("aria-pressed","true"); $("#flyArr").setAttribute("aria-pressed","false"); loadFlights(); };
+$("#flyArr").onclick = () => { flyDir = "arrivals"; $("#flyArr").setAttribute("aria-pressed","true"); $("#flyDep").setAttribute("aria-pressed","false"); loadFlights(); };
+$("#flyFilter").addEventListener("input", () => renderFlights());
+$("#flyForm").addEventListener("submit", e => e.preventDefault());
+let flyData = [];
+const airportName = code => { const a = AIRPORTS.find(x => x[0] === code); return a ? a[1].replace(/ lufthavn.*| helikopterhavn.*/, "") : code; };
+const foreignNames = {};
+async function resolveForeign(codes){
+  const need = codes.filter(c => !AIRPORTS.some(a => a[0] === c) && !(c in foreignNames));
+  await Promise.all(need.slice(0,40).map(async c => {
+    foreignNames[c] = c;
+    try { const r = await fetch(`${AVINOR}/lookup_airport?query=${c}&limit=25`); const j = await r.json(); const hit = (j.data || []).find(a => a.code === c); if (hit) foreignNames[c] = hit.name; } catch {}
+  }));
+}
+let flySeq = 0;
+async function loadFlights(){
+  clearInterval(flyTimer);
+  const my = ++flySeq, iata = $("#airport").value, dir = flyDir, out = $("#flyOut");
+  out.innerHTML = `<div class="status">Henter fra Avinor …</div>`;
+  try {
+    const all = await avinorFlights(iata, dir);
+    await resolveForeign([...new Set(all.map(f => f.airport))]);
+    if (my !== flySeq) return; // brukeren har byttet flyplass eller retning i mellomtiden
+    flyData = all.filter(f => new Date(f.schedule_time) > Date.now() - 60*60000);
+    renderFlights();
+    flyTimer = setInterval(() => { delete flightCache[iata+dir]; loadFlights(); }, 60000);
+  } catch (err) { if (my === flySeq) out.innerHTML = `<div class="err">Fikk ikke hentet flytider fra Avinor akkurat nå. Prøv igjen om litt.</div>`; }
+}
+function renderFlights(){
+  const q = $("#flyFilter").value.trim().toLowerCase();
+  const rows = flyData.filter(f => {
+    if (!q) return true;
+    const place = (airportName(f.airport) + " " + (foreignNames[f.airport]||"") + " " + f.airport).toLowerCase();
+    return place.includes(q) || f.flight_id.toLowerCase().includes(q) || (AIRLINES[f.airline]||f.airline).toLowerCase().includes(q);
+  });
+  const title = `${flyDir === "departures" ? "Avganger fra" : "Ankomster til"} ${airportName($("#airport").value)}`;
+  $("#flyOut").innerHTML = `<div class="boardhead"><h2>${esc(title)}</h2><span class="small">${rows.length} fly · oppdatert ${hm(new Date().toISOString())}</span></div>
+   ${rows.length ? `<div class="board">${rows.map(f => {
+     const st = flightStatus(f);
+     const newTime = f.status?.time && f.status.code === "E" && Math.abs(new Date(f.status.time) - new Date(f.schedule_time)) >= 60000;
+     const place = AIRPORTS.some(a => a[0] === f.airport) ? airportName(f.airport) : (foreignNames[f.airport] || f.airport);
+     return `<div class="dep${f.status?.code === "C" ? " cancel" : ""}">
+       <div class="t">${newTime ? hm(f.status.time) + `<s>${hm(f.schedule_time)}</s>` : hm(f.schedule_time)}</div>
+       <span class="badge" style="--c:var(--m-air)">${esc(f.flight_id)}</span>
+       <div class="dest"><b>${esc(place)}</b><span>${esc(AIRLINES[f.airline] || f.airline)}${dateLabel(f.schedule_time) !== "i dag" ? " · " + esc(dateLabel(f.schedule_time)) : ""}${f.area === "schengen" ? " · Schengen" : f.area === "international" ? " · Utland" : ""}</span></div>
+       <div class="right">${st ? `<span class="st ${st[1]}">${st[0]}${f.status.time && f.status.code !== "E" ? " " + hm(f.status.time) : ""}</span>` : ""}${f.gate ? `<b>Gate ${esc(f.gate)}</b>` : ""}${f.belt ? `<b>Bånd ${esc(f.belt)}</b>` : ""}</div>
+     </div>`;}).join("")}</div>` : `<div class="status">Ingen fly i tidsrommet${q ? " som passer filteret" : ""}.</div>`}`;
+}
+
+/* start */
+showTab(store.get("tab", "reise"));
+</script>
+</body>
+</html>
