@@ -72,6 +72,8 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
 .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
 /* recent */
 .recent{display:flex;flex-wrap:wrap;gap:6px}
+.recent button small{color:var(--muted);font-size:.78rem;margin-left:4px}
+.recent button[aria-pressed="true"]{border-style:solid;border-color:var(--accent);color:var(--accent)}
 .recent button{border:1px dashed var(--line);background:none;color:var(--ink);border-radius:8px;padding:6px 10px;font:inherit;font-size:.85rem;cursor:pointer}
 /* results */
 .status{padding:14px 2px;color:var(--muted)}
@@ -238,6 +240,11 @@ footer{margin-top:28px;font-size:.78rem;color:var(--muted);border-top:1px solid 
     <div class="field">
       <label class="lbl" for="stop">Holdeplass, stasjon eller ferjekai</label>
       <input type="search" id="stop" placeholder="f.eks. Moss ferjekai, Bodø sentrum, Bergen stasjon">
+      <button type="button" class="linkbtn" id="nearGeo">Finn nærmeste stopp fra min posisjon</button>
+    </div>
+    <div id="nearWrap" hidden>
+      <label class="lbl">Nærmest deg</label>
+      <div class="recent" id="near"></div>
     </div>
     <div>
       <label class="lbl">Vis</label>
@@ -970,6 +977,42 @@ let currentStop = null, depTimer = null;
 attachAC($("#stop"), {stopsOnly:true, onPick: p => { currentStop = p; loadDeps(); }});
 $("#depChips").addEventListener("change", () => currentStop && loadDeps());
 $("#depForm").addEventListener("submit", async e => { e.preventDefault(); const r = await geocode($("#stop").value, true); if (r[0]) { $("#stop").value = r[0].name; currentStop = r[0]; loadDeps(); } });
+
+/* Nærmeste stopp: de nærmeste holdeplassene uansett type, pluss nærmeste stopp for tog,
+   trikk/T-bane og båt selv om de ligger lenger unna */
+const NEAR_Q = `query($lat:Float!,$lon:Float!,$max:Float!,$n:Int!,$modes:[TransportMode]){nearest(latitude:$lat,longitude:$lon,maximumDistance:$max,maximumResults:$n,filterByPlaceTypes:[stopPlace],filterByModes:$modes,multiModalMode:parent){edges{node{distance place{... on StopPlace{id name transportMode}}}}}}`;
+const MODE_WORD = {bus:"buss",coach:"buss",rail:"tog",tram:"trikk",metro:"T-bane",water:"båt",air:"fly"};
+const fmtDist = m => m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1).replace(".", ",")} km`;
+async function nearestStops(lat, lon){
+  const ask = (max, n, modes) => gql(NEAR_Q, {lat, lon, max, n, modes}).then(d => d.nearest.edges.map(e => ({...e.node.place, distance:e.node.distance}))).catch(() => []);
+  const lists = await Promise.all([ask(1500, 4, null), ask(30000, 1, ["rail"]), ask(10000, 1, ["tram", "metro"]), ask(30000, 1, ["water"])]);
+  const seen = new Map();
+  lists.flat().forEach(p => { if (p?.id && !seen.has(p.id)) seen.set(p.id, p); });
+  return [...seen.values()].sort((a, b) => a.distance - b.distance).slice(0, 7);
+}
+function showNearest(list){
+  $("#nearWrap").hidden = !list.length; $("#near").innerHTML = "";
+  if (!list.length){ $("#depOut").innerHTML = `<div class="status">Fant ingen stopp i nærheten.</div>`; return; }
+  list.forEach((p, i) => {
+    const b = document.createElement("button"); b.type = "button";
+    const kinds = [...new Set((p.transportMode || []).map(m => MODE_WORD[m]).filter(Boolean))].join("/");
+    b.innerHTML = `${esc(p.name)}<small>${esc(kinds)} · ${fmtDist(p.distance)}</small>`;
+    b.onclick = () => { $("#near").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", "false")); b.setAttribute("aria-pressed", "true");
+      $("#stop").value = p.name; currentStop = {id:p.id, name:p.name, locality:"", cats:[]}; loadDeps(); };
+    $("#near").appendChild(b);
+    if (i === 0) b.click();
+  });
+}
+$("#nearGeo").onclick = () => {
+  const btn = $("#nearGeo");
+  if (!navigator.geolocation){ btn.textContent = "Posisjon er ikke tilgjengelig i denne nettleseren"; return; }
+  btn.textContent = "Henter posisjon …";
+  navigator.geolocation.getCurrentPosition(async pos => {
+    btn.textContent = "Finner stopp …";
+    showNearest(await nearestStops(pos.coords.latitude, pos.coords.longitude));
+    btn.textContent = "Oppdater nærmeste stopp";
+  }, () => { btn.textContent = "Fikk ikke posisjon. Tillat posisjon i nettleseren, eller skriv stoppet."; }, {enableHighAccuracy:true, timeout:10000, maximumAge:60000});
+};
 
 const DEP_Q = `query($id:String!,$modes:[TransportMode]){stopPlace(id:$id){name
   estimatedCalls(numberOfDepartures:40,timeRange:172800,whiteListedModes:$modes){
