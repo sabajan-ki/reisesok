@@ -246,7 +246,7 @@ footer{margin-top:28px;font-size:.78rem;color:var(--muted);border-top:1px solid 
       <button type="button" class="linkbtn" id="nearGeo">Finn nærmeste stopp fra min posisjon</button>
     </div>
     <div id="nearWrap" hidden>
-      <label class="lbl">Nærmest deg</label>
+      <label class="lbl">Første avgang nærmest deg</label>
       <div class="recent" id="near"></div>
       <p class="small" id="nearNote" style="margin:6px 0 0"></p>
     </div>
@@ -1026,7 +1026,7 @@ function showNearest({active, quiet}){
     $("#near").appendChild(b);
   });
   $("#nearNote").textContent = active.length
-    ? "Sortert etter neste avgang du rekker å gå til."
+    ? "Øverst står avgangen som går først av dem du rekker å gå til."
     : "Ingen avganger de neste tre timene i nærheten. Reise-fanen finner en vei med gange til et stopp lenger unna.";
   $("#near").querySelector("button").click();
 }
