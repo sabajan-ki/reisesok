@@ -418,6 +418,11 @@ function showTab(name){
   ["reise","avg","fly"].forEach(p => $("#pane-"+p).hidden = p !== name);
   store.set("tab", name);
   if (name === "fly" && !$("#flyOut").innerHTML) loadFlights();
+  if (name === "avg" && !currentStop && !$("#near").children.length) geoGranted().then(ok => ok && !currentStop && $("#nearGeo").click());
+}
+/* Posisjon brukes automatisk bare når brukeren har tillatt det før, så siden aldri spør ved oppstart */
+async function geoGranted(){
+  try { return (await navigator.permissions.query({name:"geolocation"})).state === "granted"; } catch { return false; }
 }
 document.querySelectorAll("nav.tabs button").forEach(b => b.addEventListener("click", () => showTab(b.dataset.pane)));
 
@@ -449,7 +454,7 @@ $("#useGeo").onclick = () => {
   navigator.geolocation.getCurrentPosition(async pos => {
     const {latitude:lat, longitude:lon} = pos.coords; let name = "Min posisjon";
     try { const r = await fetch(`${GEO}/reverse?point.lat=${lat}&point.lon=${lon}&size=1&lang=no`, {headers:{"ET-Client-Name":CLIENT}}); const j = await r.json(); if (j.features?.[0]) name = j.features[0].properties.name; } catch {}
-    $("#from").value = name; $("#from")._place = {id:"", name, lat, lon, cats:[]};
+    $("#from").value = `Min posisjon (${name})`; $("#from")._place = {id:"", name:`Min posisjon (${name})`, lat, lon, cats:[]};
     $("#useGeo").textContent = "Bruk min posisjon som fra";
   }, () => { $("#useGeo").textContent = "Fikk ikke posisjon. Skriv stedet i stedet."; }, {enableHighAccuracy:true, timeout:10000});
 };
@@ -957,6 +962,7 @@ async function enrichFlights(legsEl){
 
 /* siste søk */
 function saveRecent(f, t){
+  if (/^Min posisjon/.test(f.name) || /^Min posisjon/.test(t.name)) return; // posisjonen er ferskvare, lagres ikke
   const list = store.get("recent", []).filter(r => !(r.f.name === f.name && r.t.name === t.name));
   list.unshift({f, t}); store.set("recent", list.slice(0,6)); renderRecent();
 }
@@ -1121,7 +1127,11 @@ function renderFlights(){
 }
 
 /* start */
-if (!loadFromUrl()) showTab(store.get("tab", "reise"));
+if (!loadFromUrl()){
+  showTab(store.get("tab", "reise"));
+  // Reise: fyll inn «Fra» med posisjonen når den er tillatt fra før og feltet er tomt
+  geoGranted().then(ok => { if (ok && !$("#from").value) $("#useGeo").click(); });
+}
 </script>
 </body>
 </html>
