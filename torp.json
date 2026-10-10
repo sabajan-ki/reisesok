@@ -1,0 +1,318 @@
+{
+ "updated": "2026-10-10T17:55:16+02:00",
+ "source": "torp.no",
+ "departures": [
+  {
+   "date": "2026-10-10",
+   "time": "05:55",
+   "flight": "WF7736",
+   "to": "Chania",
+   "status": "Avreist 06:14",
+   "gate": "9"
+  },
+  {
+   "date": "2026-10-10",
+   "time": "06:00",
+   "flight": "SK1395",
+   "to": "København",
+   "status": "Avreist 05:51",
+   "gate": "5"
+  },
+  {
+   "date": "2026-10-10",
+   "time": "06:20",
+   "flight": "WF1343",
+   "to": "Trondheim og Tromsø",
+   "status": "Avreist 06:19",
+   "gate": "1"
+  },
+  {
+   "date": "2026-10-10",
+   "time": "08:15",
+   "flight": "FR3278",
+   "to": "Gdansk",
+   "status": "Avreist 08:05",
+   "gate": "11"
+  },
+  {
+   "date": "2026-10-10",
+   "time": "09:05",
+   "flight": "WF406",
+   "to": "Bergen",
+   "status": "Avreist 09:05",
+   "gate": "1"
+  },
+  {
+   "date": "2026-10-10",
+   "time": "09:05",
+   "flight": "RK3227",
+   "to": "Manchester",
+   "status": "Avreist 08:23",
+   "gate": "24"
+  },
+  {
+   "date": "2026-10-10",
+   "time": "09:40",
+   "flight": "FR6217",
+   "to": "Kraków",
+   "status": "Avreist 09:30",
+   "gate": "11"
+  },
+  {
+   "date": "2026-10-10",
+   "time": "12:10",
+   "flight": "WF414",
+   "to": "Bergen",
+   "status": "Avreist 12:14",
+   "gate": "1"
+  },
+  {
+   "date": "2026-10-10",
+   "time": "14:15",
+   "flight": "FR6311",
+   "to": "Kraków",
+   "status": "Avreist 14:00",
+   "gate": "11"
+  },
+  {
+   "date": "2026-10-10",
+   "time": "14:20",
+   "flight": "FR2870",
+   "to": "Riga",
+   "status": "Avreist 14:23",
+   "gate": "22"
+  },
+  {
+   "date": "2026-10-10",
+   "time": "15:05",
+   "flight": "W61516",
+   "to": "Warszawa Chopin",
+   "status": "Avreist 15:10",
+   "gate": "11"
+  },
+  {
+   "date": "2026-10-10",
+   "time": "15:30",
+   "flight": "WF418",
+   "to": "Bergen",
+   "status": "Avreist 15:37",
+   "gate": "1"
+  },
+  {
+   "date": "2026-10-10",
+   "time": "15:45",
+   "flight": "FR3588",
+   "to": "Bergamo",
+   "status": "Avreist 16:05",
+   "gate": "11"
+  },
+  {
+   "date": "2026-10-10",
+   "time": "16:15",
+   "flight": "WF1716",
+   "to": "Nice",
+   "status": "Avreist 16:11",
+   "gate": "9"
+  },
+  {
+   "date": "2026-10-10",
+   "time": "17:55",
+   "flight": "FR4943",
+   "to": "Gdansk",
+   "status": "Gate closed",
+   "gate": "11"
+  },
+  {
+   "date": "2026-10-10",
+   "time": "19:15",
+   "flight": "FR9734",
+   "to": "Poznan",
+   "status": "I rute",
+   "gate": "11"
+  },
+  {
+   "date": "2026-10-10",
+   "time": "20:30",
+   "flight": "W43216",
+   "to": "Bucharest",
+   "status": "Ny tid 20:55",
+   "gate": "11"
+  },
+  {
+   "date": "2026-10-10",
+   "time": "20:50",
+   "flight": "W64706",
+   "to": "Skopje",
+   "status": "Ny tid 21:00",
+   "gate": "24"
+  },
+  {
+   "date": "2026-10-10",
+   "time": "20:55",
+   "flight": "FR5929",
+   "to": "Dubrovnik",
+   "status": "I rute",
+   "gate": "5"
+  },
+  {
+   "date": "2026-10-11",
+   "time": "07:50",
+   "flight": "FR3278",
+   "to": "Gdansk",
+   "status": "I rute",
+   "gate": null
+  },
+  {
+   "date": "2026-10-11",
+   "time": "08:15",
+   "flight": "FR2109",
+   "to": "Wroclaw",
+   "status": "I rute",
+   "gate": null
+  },
+  {
+   "date": "2026-10-11",
+   "time": "09:05",
+   "flight": "WF406",
+   "to": "Bergen",
+   "status": "I rute",
+   "gate": null
+  },
+  {
+   "date": "2026-10-11",
+   "time": "09:45",
+   "flight": "WF436",
+   "to": "Stavanger",
+   "status": "I rute",
+   "gate": null
+  },
+  {
+   "date": "2026-10-11",
+   "time": "12:05",
+   "flight": "FR6217",
+   "to": "Kraków",
+   "status": "I rute",
+   "gate": null
+  },
+  {
+   "date": "2026-10-11",
+   "time": "12:10",
+   "flight": "WF414",
+   "to": "Bergen",
+   "status": "I rute",
+   "gate": null
+  },
+  {
+   "date": "2026-10-11",
+   "time": "12:35",
+   "flight": "FR8794",
+   "to": "Zagreb",
+   "status": "I rute",
+   "gate": null
+  },
+  {
+   "date": "2026-10-11",
+   "time": "13:05",
+   "flight": "WF1355",
+   "to": "Trondheim og Tromsø",
+   "status": "I rute",
+   "gate": null
+  },
+  {
+   "date": "2026-10-11",
+   "time": "14:00",
+   "flight": "RK33",
+   "to": "London Stansted",
+   "status": "I rute",
+   "gate": null
+  },
+  {
+   "date": "2026-10-11",
+   "time": "14:15",
+   "flight": "FH851",
+   "to": "Vantaa",
+   "status": "I rute",
+   "gate": null
+  },
+  {
+   "date": "2026-10-11",
+   "time": "15:05",
+   "flight": "W61516",
+   "to": "Warszawa Chopin",
+   "status": "I rute",
+   "gate": null
+  },
+  {
+   "date": "2026-10-11",
+   "time": "15:05",
+   "flight": "SK1397",
+   "to": "København",
+   "status": "I rute",
+   "gate": null
+  },
+  {
+   "date": "2026-10-11",
+   "time": "15:15",
+   "flight": "WF444",
+   "to": "Stavanger",
+   "status": "I rute",
+   "gate": null
+  },
+  {
+   "date": "2026-10-11",
+   "time": "15:30",
+   "flight": "WF418",
+   "to": "Bergen",
+   "status": "I rute",
+   "gate": null
+  },
+  {
+   "date": "2026-10-11",
+   "time": "17:15",
+   "flight": "FR4943",
+   "to": "Gdansk",
+   "status": "I rute",
+   "gate": null
+  },
+  {
+   "date": "2026-10-11",
+   "time": "17:45",
+   "flight": "WF486",
+   "to": "Trondheim",
+   "status": "I rute",
+   "gate": null
+  },
+  {
+   "date": "2026-10-11",
+   "time": "18:25",
+   "flight": "WF424",
+   "to": "Bergen",
+   "status": "I rute",
+   "gate": null
+  },
+  {
+   "date": "2026-10-11",
+   "time": "19:45",
+   "flight": "D85331",
+   "to": "Alicante",
+   "status": "I rute",
+   "gate": null
+  },
+  {
+   "date": "2026-10-11",
+   "time": "21:25",
+   "flight": "WF428",
+   "to": "Bergen",
+   "status": "I rute",
+   "gate": null
+  },
+  {
+   "date": "2026-10-11",
+   "time": "21:40",
+   "flight": "RK3227",
+   "to": "Manchester",
+   "status": "I rute",
+   "gate": null
+  }
+ ]
+}
